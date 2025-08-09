@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import TradingDashboard from './components/TradingDashboard';
+import AdvancedTradingDashboard from './components/AdvancedTradingDashboard';
+import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { BarChart3, Zap, Settings } from 'lucide-react';
 
 // Mock contexts for now to avoid dependency issues
 const MockSocketProvider = ({ children }) => children;
@@ -9,6 +13,7 @@ const MockSignalProvider = ({ children }) => children;
 function App() {
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [dashboardMode, setDashboardMode] = useState('standard'); // 'standard' or 'advanced'
 
   useEffect(() => {
     console.log('NSE Trading App starting...');
@@ -49,11 +54,45 @@ function App() {
     );
   }
 
+  const DashboardToggle = () => (
+    <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 bg-white rounded-lg p-2 shadow-lg border">
+      <Button
+        variant={dashboardMode === 'standard' ? "default" : "ghost"}
+        size="sm"
+        onClick={() => setDashboardMode('standard')}
+        className="flex items-center space-x-1"
+      >
+        <BarChart3 className="h-4 w-4" />
+        <span>Standard</span>
+      </Button>
+      <Button
+        variant={dashboardMode === 'advanced' ? "default" : "ghost"}
+        size="sm"
+        onClick={() => setDashboardMode('advanced')}
+        className="flex items-center space-x-1"
+      >
+        <Zap className="h-4 w-4" />
+        <span>Advanced</span>
+      </Button>
+      {dashboardMode === 'advanced' && (
+        <Badge className="bg-emerald-500 text-white text-xs">
+          <Settings className="h-3 w-3 mr-1" />
+          Pro
+        </Badge>
+      )}
+    </div>
+  );
+
   return (
     <MockSocketProvider>
       <MockMarketDataProvider>
         <MockSignalProvider>
-          <TradingDashboard connectionStatus={connectionStatus} />
+          <DashboardToggle />
+          {dashboardMode === 'standard' ? (
+            <TradingDashboard connectionStatus={connectionStatus} />
+          ) : (
+            <AdvancedTradingDashboard connectionStatus={connectionStatus} />
+          )}
         </MockSignalProvider>
       </MockMarketDataProvider>
     </MockSocketProvider>

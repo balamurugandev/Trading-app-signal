@@ -9,6 +9,8 @@ const TechnicalAnalysis = require('./services/technicalAnalysis');
 const DataProvider = require('./services/dataProvider');
 const SignalGenerator = require('./services/signalGenerator');
 const RiskManager = require('./services/riskManager');
+const AdvancedSignalEngine = require('./services/advancedSignalEngine');
+const ExecutionQualityService = require('./services/executionQuality');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +29,10 @@ const dataProvider = new DataProvider();
 const technicalAnalysis = new TechnicalAnalysis();
 const riskManager = new RiskManager();
 const signalGenerator = new SignalGenerator(technicalAnalysis, riskManager);
+
+// Initialize advanced services
+const advancedSignalEngine = new AdvancedSignalEngine();
+const executionQualityService = new ExecutionQualityService();
 
 // Market session tracking
 let isMarketOpen = false;
@@ -55,6 +61,16 @@ function checkMarketStatus() {
   return time >= '09:15' && time <= '15:30';
 }
 
+// Advanced signal engine event handlers
+advancedSignalEngine.on('advancedSignal', (signal) => {
+  console.log('Advanced signal generated:', signal);
+  io.emit('advancedSignal', signal);
+});
+
+advancedSignalEngine.on('marketQualityUpdate', (quality) => {
+  io.emit('marketQuality', quality);
+});
+
 // Socket connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -65,6 +81,9 @@ io.on('connection', (socket) => {
     isLiquidWindow: isLiquidWindow(),
     session: currentSession
   });
+  
+  // Send current market quality for advanced dashboard
+  socket.emit('marketQuality', advancedSignalEngine.getMarketQuality());
   
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
@@ -78,6 +97,29 @@ io.on('connection', (socket) => {
   socket.on('unsubscribeSymbol', (symbol) => {
     console.log(`Client unsubscribed from ${symbol}`);
     socket.leave(symbol);
+  });
+  
+  // Advanced dashboard specific events
+  socket.on('requestExecutionMetrics', () => {
+    const metrics = executionQualityService.getExecutionMetrics();
+    socket.emit('executionMetrics', metrics);
+  });
+  
+  socket.on('simulateOrder', (orderData) => {
+    const mockDepth = {
+      bestBid: orderData.price * 0.995,
+      bestAsk: orderData.price * 1.005,
+      midPrice: orderData.price,
+      spread: orderData.price * 0.01
+    };
+    
+    const fillResult = executionQualityService.simulateFill(
+      orderData, 
+      mockDepth, 
+      advancedSignalEngine.getMarketQuality().latency
+    );
+    
+    socket.emit('orderFillResult', fillResult);
   });
 });
 
@@ -196,6 +238,82 @@ app.get('/api/historical/:symbol/:timeframe', async (req, res) => {
     console.error('Historical data error:', error);
     res.status(500).json({ error: 'Failed to fetch historical data' });
   }
+});
+
+// Advanced API routes
+app.get('/api/advanced/market-quality', (req, res) => {
+  res.json({
+    quality: advancedSignalEngine.getMarketQuality(),
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
+});
+
+app.get('/api/advanced/execution-metrics', (req, res) => {
+  const { timeframe = '1d' } = req.query;
+  const metrics = executionQualityService.getExecutionMetrics(timeframe);
+  
+  res.json({
+    metrics,
+    timeframe,
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
+});
+
+app.get('/api/advanced/cost-regime', (req, res) => {
+  res.json({
+    regime: advancedSignalEngine.getCostRegime(),
+    effectiveDate: '2024-10-01',
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
+});
+
+app.post('/api/advanced/calculate-costs', (req, res) => {
+  try {
+    const { premium, quantity = 50 } = req.body;
+    
+    if (!premium) {
+      return res.status(400).json({ error: 'Premium is required' });
+    }
+    
+    const costs = advancedSignalEngine.calculateCosts(premium, quantity);
+    
+    res.json({
+      costs,
+      inputs: { premium, quantity },
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+  } catch (error) {
+    console.error('Cost calculation error:', error);
+    res.status(500).json({ error: 'Failed to calculate costs' });
+  }
+});
+
+app.post('/api/advanced/assess-liquidity', (req, res) => {
+  try {
+    const { strike, symbol } = req.body;
+    
+    if (!strike || !symbol) {
+      return res.status(400).json({ error: 'Strike and symbol are required' });
+    }
+    
+    const liquidity = advancedSignalEngine.assessLiquidity(strike, symbol);
+    
+    res.json({
+      liquidity,
+      inputs: { strike, symbol },
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+  } catch (error) {
+    console.error('Liquidity assessment error:', error);
+    res.status(500).json({ error: 'Failed to assess liquidity' });
+  }
+});
+
+app.get('/api/advanced/safety-rails', (req, res) => {
+  res.json({
+    rails: advancedSignalEngine.getSafetyRails(),
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
 });
 
 const PORT = process.env.PORT || 3001;

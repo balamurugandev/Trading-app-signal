@@ -641,20 +641,56 @@ const TradingDashboard = ({ connectionStatus }) => {
     const [technicalIndicators, setTechnicalIndicators] = useState(() => {
         if (isDemoMode) {
             return {
-                vwap: 21515.25,
-                ema9: 21508.75,
-                ema21: 21495.50,
-                rsi: 58.2,
-                macd: {
-                    line: 12.45,
-                    signal: 11.82,
-                    histogram: 0.63
+                '1m': {
+                    vwap: 21518.45,
+                    ema9: 21512.30,
+                    ema21: 21498.75,
+                    rsi: 62.8,
+                    macd: {
+                        line: 15.25,
+                        signal: 13.82,
+                        histogram: 1.43
+                    },
+                    bb: {
+                        upper: 21585.50,
+                        middle: 21520.00,
+                        lower: 21454.50,
+                        width: 0.61
+                    }
                 },
-                bb: {
-                    upper: 21580.25,
-                    middle: 21520.00,
-                    lower: 21459.75,
-                    width: 0.56
+                '5m': {
+                    vwap: 21515.25,
+                    ema9: 21508.75,
+                    ema21: 21495.50,
+                    rsi: 58.2,
+                    macd: {
+                        line: 12.45,
+                        signal: 11.82,
+                        histogram: 0.63
+                    },
+                    bb: {
+                        upper: 21580.25,
+                        middle: 21520.00,
+                        lower: 21459.75,
+                        width: 0.56
+                    }
+                },
+                '15m': {
+                    vwap: 21512.80,
+                    ema9: 21505.20,
+                    ema21: 21492.15,
+                    rsi: 54.7,
+                    macd: {
+                        line: 9.85,
+                        signal: 10.12,
+                        histogram: -0.27
+                    },
+                    bb: {
+                        upper: 21575.80,
+                        middle: 21520.00,
+                        lower: 21464.20,
+                        width: 0.52
+                    }
                 },
                 cpr: {
                     r3: 21645.50,
@@ -670,12 +706,9 @@ const TradingDashboard = ({ connectionStatus }) => {
             };
         }
         return {
-            vwap: null,
-            ema9: null,
-            ema21: null,
-            rsi: null,
-            macd: null,
-            bb: null,
+            '1m': { vwap: null, ema9: null, ema21: null, rsi: null, macd: null, bb: null },
+            '5m': { vwap: null, ema9: null, ema21: null, rsi: null, macd: null, bb: null },
+            '15m': { vwap: null, ema9: null, ema21: null, rsi: null, macd: null, bb: null },
             cpr: null
         };
     });
@@ -705,22 +738,58 @@ const TradingDashboard = ({ connectionStatus }) => {
                     changePercent: prev.changePercent + (Math.random() - 0.5) * 1
                 }));
 
-                // Update technical indicators with realistic variations
+                // Update technical indicators with realistic variations for all timeframes
                 setTechnicalIndicators(prev => ({
-                    vwap: prev.vwap + (Math.random() - 0.5) * 1.5,
-                    ema9: prev.ema9 + (Math.random() - 0.5) * 1.2,
-                    ema21: prev.ema21 + (Math.random() - 0.5) * 0.8,
-                    rsi: Math.max(20, Math.min(80, prev.rsi + (Math.random() - 0.5) * 2)),
-                    macd: {
-                        line: prev.macd.line + (Math.random() - 0.5) * 0.5,
-                        signal: prev.macd.signal + (Math.random() - 0.5) * 0.3,
-                        histogram: prev.macd.histogram + (Math.random() - 0.5) * 0.2
+                    '1m': {
+                        vwap: prev['1m'].vwap + (Math.random() - 0.5) * 2.0,
+                        ema9: prev['1m'].ema9 + (Math.random() - 0.5) * 1.8,
+                        ema21: prev['1m'].ema21 + (Math.random() - 0.5) * 1.2,
+                        rsi: Math.max(20, Math.min(80, prev['1m'].rsi + (Math.random() - 0.5) * 3)),
+                        macd: {
+                            line: prev['1m'].macd.line + (Math.random() - 0.5) * 0.8,
+                            signal: prev['1m'].macd.signal + (Math.random() - 0.5) * 0.5,
+                            histogram: prev['1m'].macd.histogram + (Math.random() - 0.5) * 0.3
+                        },
+                        bb: {
+                            upper: prev['1m'].bb.upper + (Math.random() - 0.5) * 2.5,
+                            middle: prev['1m'].bb.middle + (Math.random() - 0.5) * 2.0,
+                            lower: prev['1m'].bb.lower + (Math.random() - 0.5) * 2.5,
+                            width: Math.max(0.3, Math.min(1.8, prev['1m'].bb.width + (Math.random() - 0.5) * 0.15))
+                        }
                     },
-                    bb: {
-                        upper: prev.bb.upper + (Math.random() - 0.5) * 2,
-                        middle: prev.bb.middle + (Math.random() - 0.5) * 1.5,
-                        lower: prev.bb.lower + (Math.random() - 0.5) * 2,
-                        width: Math.max(0.2, Math.min(1.5, prev.bb.width + (Math.random() - 0.5) * 0.1))
+                    '5m': {
+                        vwap: prev['5m'].vwap + (Math.random() - 0.5) * 1.5,
+                        ema9: prev['5m'].ema9 + (Math.random() - 0.5) * 1.2,
+                        ema21: prev['5m'].ema21 + (Math.random() - 0.5) * 0.8,
+                        rsi: Math.max(20, Math.min(80, prev['5m'].rsi + (Math.random() - 0.5) * 2)),
+                        macd: {
+                            line: prev['5m'].macd.line + (Math.random() - 0.5) * 0.5,
+                            signal: prev['5m'].macd.signal + (Math.random() - 0.5) * 0.3,
+                            histogram: prev['5m'].macd.histogram + (Math.random() - 0.5) * 0.2
+                        },
+                        bb: {
+                            upper: prev['5m'].bb.upper + (Math.random() - 0.5) * 2,
+                            middle: prev['5m'].bb.middle + (Math.random() - 0.5) * 1.5,
+                            lower: prev['5m'].bb.lower + (Math.random() - 0.5) * 2,
+                            width: Math.max(0.2, Math.min(1.5, prev['5m'].bb.width + (Math.random() - 0.5) * 0.1))
+                        }
+                    },
+                    '15m': {
+                        vwap: prev['15m'].vwap + (Math.random() - 0.5) * 1.0,
+                        ema9: prev['15m'].ema9 + (Math.random() - 0.5) * 0.8,
+                        ema21: prev['15m'].ema21 + (Math.random() - 0.5) * 0.5,
+                        rsi: Math.max(20, Math.min(80, prev['15m'].rsi + (Math.random() - 0.5) * 1.5)),
+                        macd: {
+                            line: prev['15m'].macd.line + (Math.random() - 0.5) * 0.3,
+                            signal: prev['15m'].macd.signal + (Math.random() - 0.5) * 0.2,
+                            histogram: prev['15m'].macd.histogram + (Math.random() - 0.5) * 0.15
+                        },
+                        bb: {
+                            upper: prev['15m'].bb.upper + (Math.random() - 0.5) * 1.5,
+                            middle: prev['15m'].bb.middle + (Math.random() - 0.5) * 1.0,
+                            lower: prev['15m'].bb.lower + (Math.random() - 0.5) * 1.5,
+                            width: Math.max(0.15, Math.min(1.2, prev['15m'].bb.width + (Math.random() - 0.5) * 0.08))
+                        }
                     },
                     cpr: prev.cpr // CPR levels typically don't change intraday
                 }));
@@ -744,12 +813,9 @@ const TradingDashboard = ({ connectionStatus }) => {
                 changePercent: null
             });
             setTechnicalIndicators({
-                vwap: null,
-                ema9: null,
-                ema21: null,
-                rsi: null,
-                macd: null,
-                bb: null,
+                '1m': { vwap: null, ema9: null, ema21: null, rsi: null, macd: null, bb: null },
+                '5m': { vwap: null, ema9: null, ema21: null, rsi: null, macd: null, bb: null },
+                '15m': { vwap: null, ema9: null, ema21: null, rsi: null, macd: null, bb: null },
                 cpr: null
             });
             // Reset signal statistics
@@ -768,20 +834,56 @@ const TradingDashboard = ({ connectionStatus }) => {
                 changePercent: -5.28
             });
             setTechnicalIndicators({
-                vwap: 21515.25,
-                ema9: 21508.75,
-                ema21: 21495.50,
-                rsi: 58.2,
-                macd: {
-                    line: 12.45,
-                    signal: 11.82,
-                    histogram: 0.63
+                '1m': {
+                    vwap: 21518.45,
+                    ema9: 21512.30,
+                    ema21: 21498.75,
+                    rsi: 62.8,
+                    macd: {
+                        line: 15.25,
+                        signal: 13.82,
+                        histogram: 1.43
+                    },
+                    bb: {
+                        upper: 21585.50,
+                        middle: 21520.00,
+                        lower: 21454.50,
+                        width: 0.61
+                    }
                 },
-                bb: {
-                    upper: 21580.25,
-                    middle: 21520.00,
-                    lower: 21459.75,
-                    width: 0.56
+                '5m': {
+                    vwap: 21515.25,
+                    ema9: 21508.75,
+                    ema21: 21495.50,
+                    rsi: 58.2,
+                    macd: {
+                        line: 12.45,
+                        signal: 11.82,
+                        histogram: 0.63
+                    },
+                    bb: {
+                        upper: 21580.25,
+                        middle: 21520.00,
+                        lower: 21459.75,
+                        width: 0.56
+                    }
+                },
+                '15m': {
+                    vwap: 21512.80,
+                    ema9: 21505.20,
+                    ema21: 21492.15,
+                    rsi: 54.7,
+                    macd: {
+                        line: 9.85,
+                        signal: 10.12,
+                        histogram: -0.27
+                    },
+                    bb: {
+                        upper: 21575.80,
+                        middle: 21520.00,
+                        lower: 21464.20,
+                        width: 0.52
+                    }
                 },
                 cpr: {
                     r3: 21645.50,
@@ -813,6 +915,9 @@ const TradingDashboard = ({ connectionStatus }) => {
         setTotalSignalsCount(stats.total);
         setWinRate(stats.winRate);
     };
+
+    // Get current timeframe indicators
+    const currentIndicators = technicalIndicators[selectedTimeframe] || {};
 
     const ConnectionIndicator = () => (
         <div className="flex items-center space-x-2">
@@ -956,10 +1061,63 @@ const TradingDashboard = ({ connectionStatus }) => {
                     {/* Market Analysis */}
                     <Card className="shadow-lg">
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-xl flex items-center space-x-2">
-                                <BarChart3 className="h-5 w-5" />
-                                <span>Market Analysis</span>
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-xl flex items-center space-x-2">
+                                    <BarChart3 className="h-5 w-5" />
+                                    <span>Market Analysis</span>
+                                </CardTitle>
+
+                                {/* Symbol and Timeframe Selectors */}
+                                <div className="flex items-center space-x-3">
+                                    {/* Symbol Selector */}
+                                    <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border">
+                                        <Button
+                                            variant={selectedSymbol === 'NIFTY' ? "default" : "ghost"}
+                                            size="sm"
+                                            onClick={() => setSelectedSymbol('NIFTY')}
+                                            className="text-xs"
+                                        >
+                                            NIFTY
+                                        </Button>
+                                        <Button
+                                            variant={selectedSymbol === 'BANKNIFTY' ? "default" : "ghost"}
+                                            size="sm"
+                                            onClick={() => setSelectedSymbol('BANKNIFTY')}
+                                            className="text-xs"
+                                        >
+                                            BANKNIFTY
+                                        </Button>
+                                    </div>
+
+                                    {/* Timeframe Selector */}
+                                    <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border">
+                                        <Button
+                                            variant={selectedTimeframe === '1m' ? "default" : "ghost"}
+                                            size="sm"
+                                            onClick={() => setSelectedTimeframe('1m')}
+                                            className="text-xs"
+                                        >
+                                            1m
+                                        </Button>
+                                        <Button
+                                            variant={selectedTimeframe === '5m' ? "default" : "ghost"}
+                                            size="sm"
+                                            onClick={() => setSelectedTimeframe('5m')}
+                                            className="text-xs"
+                                        >
+                                            5m
+                                        </Button>
+                                        <Button
+                                            variant={selectedTimeframe === '15m' ? "default" : "ghost"}
+                                            size="sm"
+                                            onClick={() => setSelectedTimeframe('15m')}
+                                            className="text-xs"
+                                        >
+                                            15m
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="bg-gradient-to-br from-gray-50 to-gray-100 h-64 rounded-lg flex items-center justify-center border">
@@ -1024,7 +1182,7 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <p className="text-sm text-blue-700 font-medium">VWAP</p>
                                     </div>
                                     <p className="text-lg font-bold text-blue-900">
-                                        {technicalIndicators.vwap ? formatSpotPrice(technicalIndicators.vwap) : (isDemoMode ? '--' : 'Live Data')}
+                                        {currentIndicators.vwap ? formatSpotPrice(currentIndicators.vwap) : (isDemoMode ? '--' : 'Live Data')}
                                     </p>
                                     <p className="text-xs text-blue-600 mt-1">Volume Weighted Avg</p>
                                 </div>
@@ -1036,7 +1194,7 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <p className="text-sm text-green-700 font-medium">EMA 9</p>
                                     </div>
                                     <p className="text-lg font-bold text-green-900">
-                                        {technicalIndicators.ema9 ? formatSpotPrice(technicalIndicators.ema9) : (isDemoMode ? '--' : 'Live Data')}
+                                        {currentIndicators.ema9 ? formatSpotPrice(currentIndicators.ema9) : (isDemoMode ? '--' : 'Live Data')}
                                     </p>
                                     <p className="text-xs text-green-600 mt-1">9-period EMA</p>
                                 </div>
@@ -1048,7 +1206,7 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <p className="text-sm text-green-700 font-medium">EMA 21</p>
                                     </div>
                                     <p className="text-lg font-bold text-green-900">
-                                        {technicalIndicators.ema21 ? formatSpotPrice(technicalIndicators.ema21) : (isDemoMode ? '--' : 'Live Data')}
+                                        {currentIndicators.ema21 ? formatSpotPrice(currentIndicators.ema21) : (isDemoMode ? '--' : 'Live Data')}
                                     </p>
                                     <p className="text-xs text-green-600 mt-1">21-period EMA</p>
                                 </div>
@@ -1060,7 +1218,7 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <p className="text-sm text-yellow-700 font-medium">RSI (14)</p>
                                     </div>
                                     <p className="text-lg font-bold text-yellow-900">
-                                        {technicalIndicators.rsi ? technicalIndicators.rsi.toFixed(1) : (isDemoMode ? '--' : 'Live Data')}
+                                        {currentIndicators.rsi ? currentIndicators.rsi.toFixed(1) : (isDemoMode ? '--' : 'Live Data')}
                                     </p>
                                     <p className="text-xs text-yellow-600 mt-1">Relative Strength</p>
                                 </div>
@@ -1072,7 +1230,7 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <p className="text-sm text-purple-700 font-medium">MACD</p>
                                     </div>
                                     <p className="text-lg font-bold text-purple-900">
-                                        {technicalIndicators.macd ? technicalIndicators.macd.line.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
+                                        {currentIndicators.macd ? currentIndicators.macd.line.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
                                     </p>
                                     <p className="text-xs text-purple-600 mt-1">Momentum</p>
                                 </div>
@@ -1090,19 +1248,19 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <div className="flex justify-between">
                                             <span>MACD Line:</span>
                                             <span className="font-mono font-bold">
-                                                {technicalIndicators.macd ? technicalIndicators.macd.line.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
+                                                {currentIndicators.macd ? currentIndicators.macd.line.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Signal Line:</span>
                                             <span className="font-mono font-bold">
-                                                {technicalIndicators.macd ? technicalIndicators.macd.signal.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
+                                                {currentIndicators.macd ? currentIndicators.macd.signal.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Histogram:</span>
-                                            <span className={`font-mono font-bold ${technicalIndicators.macd && technicalIndicators.macd.histogram >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {technicalIndicators.macd ? (technicalIndicators.macd.histogram >= 0 ? '+' : '') + technicalIndicators.macd.histogram.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
+                                            <span className={`font-mono font-bold ${currentIndicators.macd && currentIndicators.macd.histogram >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {currentIndicators.macd ? (currentIndicators.macd.histogram >= 0 ? '+' : '') + currentIndicators.macd.histogram.toFixed(2) : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                     </div>
@@ -1118,25 +1276,25 @@ const TradingDashboard = ({ connectionStatus }) => {
                                         <div className="flex justify-between">
                                             <span>Upper Band:</span>
                                             <span className="font-mono font-bold text-red-600">
-                                                {technicalIndicators.bb ? formatSpotPrice(technicalIndicators.bb.upper) : (isDemoMode ? '--' : 'Live Data')}
+                                                {currentIndicators.bb ? formatSpotPrice(currentIndicators.bb.upper) : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Middle Band:</span>
                                             <span className="font-mono font-bold">
-                                                {technicalIndicators.bb ? formatSpotPrice(technicalIndicators.bb.middle) : (isDemoMode ? '--' : 'Live Data')}
+                                                {currentIndicators.bb ? formatSpotPrice(currentIndicators.bb.middle) : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Lower Band:</span>
                                             <span className="font-mono font-bold text-green-600">
-                                                {technicalIndicators.bb ? formatSpotPrice(technicalIndicators.bb.lower) : (isDemoMode ? '--' : 'Live Data')}
+                                                {currentIndicators.bb ? formatSpotPrice(currentIndicators.bb.lower) : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Width:</span>
                                             <span className="font-mono font-bold">
-                                                {technicalIndicators.bb ? technicalIndicators.bb.width.toFixed(2) + '%' : (isDemoMode ? '--' : 'Live Data')}
+                                                {currentIndicators.bb ? currentIndicators.bb.width.toFixed(2) + '%' : (isDemoMode ? '--' : 'Live Data')}
                                             </span>
                                         </div>
                                     </div>
