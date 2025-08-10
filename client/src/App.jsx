@@ -55,12 +55,12 @@ function App() {
   }
 
   const DashboardToggle = () => (
-    <div className="fixed top-4 right-4 z-50 flex items-center space-x-2 bg-white rounded-lg p-2 shadow-lg border">
+    <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-2 bg-white rounded-lg p-3 shadow-xl border border-gray-200 backdrop-blur-sm">
       <Button
         variant={dashboardMode === 'standard' ? "default" : "ghost"}
         size="sm"
         onClick={() => setDashboardMode('standard')}
-        className="flex items-center space-x-1"
+        className="flex items-center space-x-1 text-sm"
       >
         <BarChart3 className="h-4 w-4" />
         <span>Standard</span>
@@ -69,13 +69,13 @@ function App() {
         variant={dashboardMode === 'advanced' ? "default" : "ghost"}
         size="sm"
         onClick={() => setDashboardMode('advanced')}
-        className="flex items-center space-x-1"
+        className="flex items-center space-x-1 text-sm"
       >
         <Zap className="h-4 w-4" />
         <span>Advanced</span>
       </Button>
       {dashboardMode === 'advanced' && (
-        <Badge className="bg-emerald-500 text-white text-xs">
+        <Badge className="bg-emerald-500 text-white text-xs animate-pulse">
           <Settings className="h-3 w-3 mr-1" />
           Pro
         </Badge>
