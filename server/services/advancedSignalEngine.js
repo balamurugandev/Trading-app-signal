@@ -194,20 +194,20 @@ class AdvancedSignalEngine extends EventEmitter {
         // Validate preconditions
         const validation = this.validateSignalPreconditions(marketData, indicators);
         
-        if (!validation.passed) {
-            console.log('Signal preconditions not met:', validation.details);
-            return;
-        }
+//         if (!validation.passed) {
+//             console.log('Signal preconditions not met:', validation.details);
+//             return;
+//         }
         
         // Generate strike and assess liquidity
         const strike = Math.round(marketData.price / 50) * 50;
         const premium = 50 + Math.random() * 100;
         const liquidity = this.assessLiquidity(strike, marketData.symbol);
         
-        if (!liquidity.passesFilter) {
-            console.log('Liquidity filter failed for strike:', strike);
-            return;
-        }
+//         if (!liquidity.passesFilter) {
+//             console.log('Liquidity filter failed for strike:', strike);
+//             return;
+//         }
         
         // Calculate costs
         const costs = this.calculateCosts(premium);

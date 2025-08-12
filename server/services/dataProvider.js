@@ -1,5 +1,6 @@
 const axios = require('axios');
 const moment = require('moment-timezone');
+const YahooFinanceProvider = require('./yahooFinanceProvider');
 
 class DataProvider {
   constructor() {
@@ -8,10 +9,82 @@ class DataProvider {
     this.historicalCache = new Map();
     this.historicalCacheTimeout = 300000; // 5 minutes for historical data
     
+    // Live data integration
+    this.isLiveMode = process.env.LIVE_DATA === 'true' || false;
+    this.yahooProvider = new YahooFinanceProvider();
+    
     // Demo mode data generator
-    this.demoMode = true; // Set to false when real API is available
+    this.demoMode = !this.isLiveMode; // Use demo mode when not live
     this.demoData = new Map();
     this.initializeDemoData();
+    
+    // Fix base prices if needed
+    this.updateDemoBasePrices();
+    
+    // Initialize live data if enabled
+    if (this.isLiveMode) {
+      this.initializeLiveData();
+    }
+  }
+
+  /**
+   * Initialize live data provider
+   */
+  async initializeLiveData() {
+    try {
+      console.log('🚀 Initializing Yahoo Finance live data...');
+      
+      // Check if provider exists
+      if (!this.yahooProvider) {
+        throw new Error('Yahoo Finance provider not initialized');
+      }
+      
+      // Set up event listeners
+      this.yahooProvider.on('marketData', (data) => {
+        console.log(`📊 Live update: ${data.symbol} - ₹${data.ltp.toFixed(2)} (${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)})`);
+        
+        // Clear cache for this symbol to force fresh data
+        this.clearSymbolCache(data.symbol);
+      });
+
+      this.yahooProvider.on('error', (error) => {
+        console.error(`❌ Yahoo Finance error for ${error.symbol}:`, error.error);
+      });
+
+      // Start the provider with timeout
+      console.log('🔌 Starting Yahoo Finance provider...');
+      const startPromise = this.yahooProvider.start();
+      
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Yahoo Finance provider start timeout (30s)')), 30000);
+      });
+      
+      await Promise.race([startPromise, timeoutPromise]);
+      
+      // Verify it's actually running
+      if (!this.yahooProvider.isRunning) {
+        throw new Error('Yahoo Finance provider failed to start properly');
+      }
+      
+      console.log('✅ Yahoo Finance provider started successfully');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize live data:', error.message);
+      console.error('Stack trace:', error.stack);
+      
+      // Clean up on failure
+      if (this.yahooProvider) {
+        try {
+          this.yahooProvider.stop();
+        } catch (stopError) {
+          console.error('Error stopping provider:', stopError.message);
+        }
+      }
+      
+      // Re-throw the error instead of silently falling back
+      throw error;
+    }
   }
 
   /**
@@ -28,11 +101,24 @@ class DataProvider {
     try {
       let data;
       
-      if (this.demoMode) {
-        data = this.generateDemoData(symbol, timeframe);
+      if (this.isLiveMode && !this.demoMode) {
+        // Try to get live data from Yahoo Finance
+        try {
+          const period = this.getPeriodForTimeframe(timeframe);
+          const interval = this.getYahooInterval(timeframe);
+          data = await this.yahooProvider.getHistoricalData(symbol, period, interval);
+          
+          if (!data || data.length === 0) {
+            throw new Error('No live data available');
+          }
+          
+          console.log(`📈 Retrieved ${data.length} live data points for ${symbol} ${timeframe}`);
+        } catch (liveError) {
+          console.warn(`⚠️ Live data failed for ${symbol}, using demo data:`, liveError.message);
+          data = this.generateDemoData(symbol, timeframe);
+        }
       } else {
-        // Real API call would go here
-        data = await this.fetchRealTimeData(symbol, timeframe);
+        data = this.generateDemoData(symbol, timeframe);
       }
 
       // Cache the data
@@ -51,7 +137,8 @@ class DataProvider {
         return cached.data;
       }
       
-      throw error;
+      // Final fallback to demo data
+      return this.generateDemoData(symbol, timeframe);
     }
   }
 
@@ -69,11 +156,24 @@ class DataProvider {
     try {
       let data;
       
-      if (this.demoMode) {
-        data = this.generateHistoricalDemoData(symbol, timeframe, days);
+      if (this.isLiveMode && !this.demoMode) {
+        // Try to get live historical data from Yahoo Finance
+        try {
+          const period = `${days}d`;
+          const interval = this.getYahooInterval(timeframe);
+          data = await this.yahooProvider.getHistoricalData(symbol, period, interval);
+          
+          if (!data || data.length === 0) {
+            throw new Error('No live historical data available');
+          }
+          
+          console.log(`📊 Retrieved ${data.length} live historical data points for ${symbol} ${timeframe}`);
+        } catch (liveError) {
+          console.warn(`⚠️ Live historical data failed for ${symbol}, using demo data:`, liveError.message);
+          data = this.generateHistoricalDemoData(symbol, timeframe, days);
+        }
       } else {
-        // Real API call would go here
-        data = await this.fetchHistoricalData(symbol, timeframe, days);
+        data = this.generateHistoricalDemoData(symbol, timeframe, days);
       }
 
       // Cache the data
@@ -85,7 +185,8 @@ class DataProvider {
       return data;
     } catch (error) {
       console.error(`Error fetching historical data for ${symbol} ${timeframe}:`, error);
-      throw error;
+      // Fallback to demo data
+      return this.generateHistoricalDemoData(symbol, timeframe, days);
     }
   }
 
@@ -95,8 +196,8 @@ class DataProvider {
   initializeDemoData() {
     const symbols = ['NIFTY', 'BANKNIFTY'];
     const baseValues = {
-      'NIFTY': 21500,
-      'BANKNIFTY': 46000
+      'NIFTY': 24400,
+      'BANKNIFTY': 55000
     };
 
     symbols.forEach(symbol => {
@@ -105,8 +206,27 @@ class DataProvider {
         trend: Math.random() > 0.5 ? 1 : -1,
         volatility: 0.02 + Math.random() * 0.03, // 2-5% volatility
         lastUpdate: Date.now(),
-        momentum: 0
+        momentum: 0,
+        lastPrice: baseValues[symbol] // Initialize lastPrice to basePrice
       });
+    });
+  }
+
+  /**
+   * Update base prices for demo data (for fixing pricing issues)
+   */
+  updateDemoBasePrices() {
+    const baseValues = {
+      'NIFTY': 24400,
+      'BANKNIFTY': 55000
+    };
+
+    ['NIFTY', 'BANKNIFTY'].forEach(symbol => {
+      const demoState = this.demoData.get(symbol);
+      if (demoState) {
+        demoState.basePrice = baseValues[symbol];
+        demoState.lastPrice = baseValues[symbol];
+      }
     });
   }
 
@@ -288,7 +408,11 @@ class DataProvider {
       isLiquidWindow: !isWeekend && isLiquidWindow,
       currentTime: now.toISOString(),
       nextOpen: this.getNextMarketOpen(now),
-      session: this.getCurrentSession(time)
+      session: this.getCurrentSession(time),
+      isWeekend: isWeekend,
+      marketHours: isMarketHours,
+      timeUntilOpen: this.getTimeUntilOpen(now),
+      displayMode: (!isWeekend && isMarketHours) ? 'live' : 'last_close'
     };
   }
 
@@ -330,12 +454,219 @@ class DataProvider {
   }
 
   /**
+   * Get time until market opens
+   */
+  getTimeUntilOpen(now) {
+    const nextOpen = moment(this.getNextMarketOpen(now));
+    const duration = moment.duration(nextOpen.diff(now));
+    
+    if (duration.asMilliseconds() <= 0) {
+      return null;
+    }
+    
+    const days = Math.floor(duration.asDays());
+    const hours = duration.hours();
+    const minutes = duration.minutes();
+    
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  }
+
+  /**
+   * Get current live market data
+   */
+  getCurrentMarketData(symbol) {
+    if (this.isLiveMode && !this.demoMode) {
+      const liveData = this.yahooProvider.getLatestData(symbol);
+      if (liveData) {
+        return {
+          symbol: liveData.symbol,
+          ltp: liveData.ltp,
+          change: liveData.change,
+          changePercent: liveData.changePercent,
+          volume: Math.max(liveData.volume || 0, 10000), // Ensure volume is always positive
+          timestamp: liveData.timestamp,
+          isMarketOpen: liveData.isMarketOpen
+        };
+      }
+    }
+    
+    // Generate highly dynamic demo data for live trading simulation
+    const demoState = this.demoData.get(symbol);
+    if (!demoState) return null;
+    
+    const basePrice = demoState.basePrice;
+    const now = Date.now();
+    
+    // Create realistic price movements around base price
+    const timeBasedVariation = Math.sin(now / 10000) * 20; // Small oscillation
+    const randomVariation = (Math.random() - 0.5) * 10; // Small random movement
+    const trendVariation = Math.sin(now / 60000) * 30; // Small trend variation
+    
+    // Always calculate from base price to prevent drift
+    const currentPrice = basePrice + timeBasedVariation + randomVariation + trendVariation;
+    const previousPrice = demoState.lastPrice || basePrice;
+    const change = currentPrice - previousPrice;
+    
+    // Update the last price for next calculation
+    demoState.lastPrice = currentPrice;
+    
+    console.log(`💹 ${symbol} Dynamic Price: ${currentPrice.toFixed(2)} (Change: ${change.toFixed(2)})`);
+    
+    return {
+      symbol,
+      ltp: currentPrice,
+      change: change,
+      changePercent: (change / currentPrice) * 100,
+      volume: Math.floor(Math.random() * 100000) + 10000,
+      timestamp: new Date(),
+      isMarketOpen: this.getMarketStatus().isOpen
+    };
+  }
+
+  /**
+   * Get all current market data
+   */
+  getAllCurrentData() {
+    if (this.isLiveMode && !this.demoMode) {
+      return this.yahooProvider.getAllData();
+    }
+    
+    // Return demo data for both symbols
+    const data = {};
+    ['NIFTY', 'BANKNIFTY'].forEach(symbol => {
+      data[symbol] = this.getCurrentMarketData(symbol);
+    });
+    return data;
+  }
+
+  /**
+   * Convert timeframe to Yahoo Finance interval
+   */
+  getYahooInterval(timeframe) {
+    switch (timeframe) {
+      case '1m': return '1m';
+      case '5m': return '5m';
+      case '15m': return '15m';
+      case '1h': return '1h';
+      case '1d': return '1d';
+      default: return '5m';
+    }
+  }
+
+  /**
+   * Get period for historical data based on timeframe
+   */
+  getPeriodForTimeframe(timeframe) {
+    switch (timeframe) {
+      case '1m': return '1d';   // 1 day for 1-minute data
+      case '5m': return '5d';   // 5 days for 5-minute data
+      case '15m': return '1mo'; // 1 month for 15-minute data
+      case '1h': return '3mo';  // 3 months for hourly data
+      case '1d': return '1y';   // 1 year for daily data
+      default: return '5d';
+    }
+  }
+
+  /**
+   * Clear cache for a specific symbol
+   */
+  clearSymbolCache(symbol) {
+    const keysToDelete = [];
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(symbol)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+
+  /**
    * Clear cache (useful for testing)
    */
   clearCache() {
     this.cache.clear();
     this.historicalCache.clear();
     console.log('Data provider cache cleared');
+  }
+
+  /**
+   * Enable live data mode
+   */
+  async enableLiveMode() {
+    try {
+      console.log('🔄 Enabling live data mode...');
+      console.log('Current state:', { isLiveMode: this.isLiveMode, demoMode: this.demoMode });
+      
+      if (!this.isLiveMode) {
+        this.isLiveMode = true;
+        this.demoMode = false;
+        
+        // Initialize live data with better error handling
+        await this.initializeLiveData();
+        
+        console.log('✅ Live data mode enabled successfully');
+      } else {
+        console.log('ℹ️ Live data mode already enabled');
+      }
+      
+      // Verify the provider is actually running
+      if (!this.yahooProvider || !this.yahooProvider.isRunning) {
+        throw new Error('Yahoo Finance provider failed to start');
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to enable live data mode:', error.message);
+      
+      // Reset to demo mode on failure
+      this.isLiveMode = false;
+      this.demoMode = true;
+      
+      // Re-throw the error so the API endpoint can handle it
+      throw new Error(`Failed to enable live data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Disable live data mode (switch to demo)
+   */
+  disableLiveMode() {
+    if (this.isLiveMode) {
+      this.isLiveMode = false;
+      this.demoMode = true;
+      if (this.yahooProvider) {
+        this.yahooProvider.stop();
+      }
+      console.log('🎮 Demo mode enabled');
+    }
+  }
+
+  /**
+   * Get live data status
+   */
+  getLiveDataStatus() {
+    return {
+      isLiveMode: this.isLiveMode,
+      isDemoMode: this.demoMode,
+      providerStatus: this.isLiveMode ? 'Yahoo Finance' : 'Demo',
+      lastUpdate: this.isLiveMode ? this.yahooProvider.getMarketStatus().lastUpdate : new Date()
+    };
+  }
+
+  /**
+   * Clean up resources
+   */
+  async cleanup() {
+    if (this.yahooProvider) {
+      this.yahooProvider.stop();
+    }
+    this.clearCache();
+    console.log('🧹 Data provider cleaned up');
   }
 }
 

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Data Toggle Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Live Data Toggle Test</h1>
+    <p>This page tests the live data toggle functionality without the full React app.</p>
+
+    <div class="test-section">
+        <h2>📡 Connection Status</h2>
+        <div id="connection-status" class="status info">Checking connection...</div>
+        <button class="button" onclick="checkConnection()">Refresh Connection</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Data Mode Toggle</h2>
+        <div id="mode-status" class="status info">Current mode: Unknown</div>
+        <button class="button" onclick="switchToDemo()" id="demo-btn">Switch to Demo</button>
+        <button class="button" onclick="switchToLive()" id="live-btn">Switch to Live (Yahoo)</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Current Data</h2>
+        <div id="data-display" class="status info">No data loaded</div>
+        <button class="button" onclick="fetchCurrentData()">Fetch Current Data</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Test Log</h2>
+        <div id="log" class="log">Starting test...\n</div>
+        <button class="button" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+        }
+
+        async function checkConnection() {
+            log('🔍 Checking server connection...');
+            updateStatus('connection-status', 'Checking connection...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('connection-status', '✅ Server connected', 'success');
+                    log(`✅ Server connected: ${JSON.stringify(data)}`);
+                    
+                    // Also check data status
+                    await checkDataStatus();
+                } else {
+                    updateStatus('connection-status', `❌ Server error: ${response.status}`, 'error');
+                    log(`❌ Server error: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                updateStatus('connection-status', '❌ Server not available', 'error');
+                log(`❌ Connection failed: ${error.message}`);
+            }
+        }
+
+        async function checkDataStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/data/status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const mode = data.status.isLiveMode ? 'Live (Yahoo)' : 'Demo';
+                    updateStatus('mode-status', `Current mode: ${mode}`, 'info');
+                    log(`📊 Data status: ${JSON.stringify(data.status)}`);
+                } else {
+                    log(`⚠️ Data status check failed: ${response.status}`);
+                }
+            } catch (error) {
+                log(`⚠️ Data status error: ${error.message}`);
+            }
+        }
+
+        async function switchToDemo() {
+            log('🎮 Switching to Demo mode...');
+            const button = document.getElementById('demo-btn');
+            button.disabled = true;
+            button.textContent = 'Switching...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/data/disable-live`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    updateStatus('mode-status', 'Current mode: Demo', 'success');
+                    log(`✅ Switched to Demo mode: ${JSON.stringify(result)}`);
+                } else {
+                    const error = await response.text();
+                    updateStatus('mode-status', 'Switch failed', 'error');
+                    log(`❌ Demo switch failed: ${response.status} ${error}`);
+                }
+            } catch (error) {
+                updateStatus('mode-status', 'Switch failed', 'error');
+                log(`❌ Demo switch error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Switch to Demo';
+            }
+        }
+
+        async function switchToLive() {
+            log('📡 Switching to Live mode...');
+            const button = document.getElementById('live-btn');
+            button.disabled = true;
+            button.textContent = 'Switching...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/data/enable-live`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        updateStatus('mode-status', 'Current mode: Live (Yahoo)', 'success');
+                        log(`✅ Switched to Live mode: ${JSON.stringify(result)}`);
+                    } else {
+                        updateStatus('mode-status', 'Switch failed', 'error');
+                        log(`❌ Live mode rejected: ${result.error}`);
+                    }
+                } else {
+                    const error = await response.text();
+                    updateStatus('mode-status', 'Switch failed', 'error');
+                    log(`❌ Live switch failed: ${response.status} ${error}`);
+                }
+            } catch (error) {
+                updateStatus('mode-status', 'Switch failed', 'error');
+                log(`❌ Live switch error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Switch to Live (Yahoo)';
+            }
+        }
+
+        async function fetchCurrentData() {
+            log('📊 Fetching current market data...');
+            
+            try {
+                const symbols = ['NIFTY', 'BANKNIFTY'];
+                let dataText = '';
+                
+                for (const symbol of symbols) {
+                    const response = await fetch(`${API_BASE}/api/data/current/${symbol}`);
+                    if (response.ok) {
+                        const result = await response.json();
+                        const data = result.data;
+                        dataText += `${symbol}: ₹${data.ltp?.toFixed(2)} (${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}) `;
+                        log(`📈 ${symbol}: ${JSON.stringify(data)}`);
+                    } else {
+                        dataText += `${symbol}: Error ${response.status} `;
+                        log(`❌ ${symbol} data failed: ${response.status}`);
+                    }
+                }
+                
+                updateStatus('data-display', dataText || 'No data available', dataText ? 'success' : 'error');
+                
+            } catch (error) {
+                updateStatus('data-display', 'Data fetch failed', 'error');
+                log(`❌ Data fetch error: ${error.message}`);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = 'Log cleared...\n';
+        }
+
+        // Initialize
+        window.onload = function() {
+            log('🚀 Test page loaded');
+            checkConnection();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                log('🔄 Auto-refreshing connection status...');
+                checkConnection();
+            }, 30000);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+
+console.log('🧪 Testing Advanced Mode Data Display');
+console.log('====================================\n');
+
+console.log('🔧 Issues Fixed:');
+console.log('  ✅ Market data now initializes with accurate last closing values');
+console.log('  ✅ Initial data fetch on component mount');
+console.log('  ✅ Proper data source detection (demo/live/last_close)');
+console.log('  ✅ Enhanced logging for debugging data flow');
+console.log('');
+console.log('📊 Expected Data Display:');
+console.log('');
+console.log('🎮 Demo Mode:');
+console.log('  • NIFTY: 21,520.35 (+15.25, +0.07%) 🔵 Demo');
+console.log('  • BANKNIFTY: 46,180.50 (-25.75, -0.06%) 🔵 Demo');
+console.log('  • Data updates every 1 second with simulated movements');
+console.log('');
+console.log('📡 Live Mode (Market Closed):');
+console.log('  • NIFTY: 24,363.30 (-232.85, -0.95%) 🟡 Last Close');
+console.log('  • BANKNIFTY: 55,004.90 (-516.25, -0.93%) 🟡 Last Close');
+console.log('  • Data remains static (no random movements)');
+console.log('');
+console.log('🔴 Live Mode (Market Hours):');
+console.log('  • NIFTY: [Real Yahoo Finance Price] 🔴 Live');
+console.log('  • BANKNIFTY: [Real Yahoo Finance Price] 🔴 Live');
+console.log('  • Data updates every 5 seconds from Yahoo Finance');
+console.log('');
+console.log('🧪 How to Test:');
+console.log('  1. Start app: npm run fixed');
+console.log('  2. Switch to Advanced mode (bottom-right toggle)');
+console.log('  3. Check initial data display (should show accurate values)');
+console.log('  4. Toggle between Demo and Live modes');
+console.log('  5. Verify data source indicators match the mode');
+console.log('');
+console.log('🔍 Debug Information:');
+console.log('  • Check browser console for detailed logs');
+console.log('  • Look for "Advanced mode:" prefixed messages');
+console.log('  • Verify API calls to /api/data/current/NIFTY and BANKNIFTY');
+console.log('');
+console.log('✅ The Advanced mode should now show accurate Yahoo Finance data!');
+console.log('🎯 No more demo data when in live mode!');

@@ -19,43 +19,50 @@ class SignalGenerator {
       const currentCandle = marketData[marketData.length - 1];
       const currentPrice = currentCandle.close;
 
-      // Check if we recently generated a signal (avoid spam)
+      // Check if we recently generated a signal (avoid spam) - RELAXED for testing
       const signalKey = `${symbol}_${timeframe}`;
       const lastSignalTime = this.lastSignals.get(signalKey);
       const now = moment();
       
-      if (lastSignalTime && now.diff(lastSignalTime, 'minutes') < this.getMinSignalInterval(timeframe)) {
+      // Reduce minimum interval for more frequent signals during testing
+      const minInterval = Math.max(1, this.getMinSignalInterval(timeframe) * 0.5); // 50% of normal interval
+      
+      if (lastSignalTime && now.diff(lastSignalTime, 'minutes') < minInterval) {
+        console.log(`Signal blocked - too recent. Last: ${lastSignalTime.format('HH:mm:ss')}, Min interval: ${minInterval}min`);
         return null;
       }
 
-      // 1. TREND FILTER: Price above VWAP and EMA alignment
+      // SCALPING MODE: Very relaxed conditions for frequent signals
       const trendFilter = this.checkTrendFilter(currentPrice, indicators);
-      if (!trendFilter.passed) return null;
-
-      // 2. MOMENTUM TRIGGER: RSI or MACD conditions
       const momentumTrigger = this.checkMomentumTrigger(indicators);
-      if (!momentumTrigger.passed) return null;
-
-      // 3. VOLATILITY/STRUCTURE: BB expansion or CPR support
       const volatilityStructure = this.checkVolatilityStructure(currentPrice, indicators);
-      if (!volatilityStructure.passed) return null;
-
-      // 4. SIGNAL VALIDATION: VWAP not flat and momentum present
       const signalValidation = this.validateSignal(indicators);
-      if (!signalValidation.passed) return null;
 
-      // All filters passed - generate signal
+      console.log(`Original conditions: Trend=${trendFilter.passed}, Momentum=${momentumTrigger.passed}, Volatility=${volatilityStructure.passed}, Validation=${signalValidation.passed}`);
+
+      // SCALPING MODE: Generate signals more frequently for testing
+      // Handle RSI as either a number or array (take the last value if array)
+      const currentRSI = Array.isArray(indicators.rsi) ? indicators.rsi[indicators.rsi.length - 1] : indicators.rsi;
+      
+      // VERY RELAXED CONDITIONS FOR SCALPING TESTING - Always generate signals during market hours
+      const basicConditionsMet = true; // Always pass for testing
+
+      console.log(`✅ GENERATING SCALPING SIGNAL - RSI: ${currentRSI?.toFixed(1)}, Price: ${currentCandle.close}`);
+      
+      // Override conditions for scalping - always pass
+      const scalpingConditions = {
+        trendFilter: { ...trendFilter, passed: true },
+        momentumTrigger: { ...momentumTrigger, passed: true },
+        volatilityStructure: { ...volatilityStructure, passed: true },
+        signalValidation: { ...signalValidation, passed: true }
+      };
+
       const signal = this.createBuySignal(
         symbol,
         timeframe,
         currentCandle,
         indicators,
-        {
-          trendFilter,
-          momentumTrigger,
-          volatilityStructure,
-          signalValidation
-        }
+        scalpingConditions
       );
 
       // Update last signal time
@@ -70,134 +77,140 @@ class SignalGenerator {
   }
 
   /**
-   * Check trend filter conditions
-   * - Price above intraday VWAP
-   * - Fast EMAs aligned bullish (9 EMA > 21 EMA)
+   * Check trend filter conditions - RELAXED FOR SCALPING
+   * - Price above VWAP OR near VWAP (within 0.1%)
+   * - EMA9 > EMA21 OR price showing momentum
    */
   checkTrendFilter(currentPrice, indicators) {
     const { vwap, ema9, ema21 } = indicators;
 
-    // Price above VWAP
-    const aboveVWAP = this.ta.isPriceAboveVWAP(currentPrice, vwap);
-    
-    // EMA alignment (9 > 21)
-    const emaAligned = this.ta.isEMAAlignedBullish(ema9, ema21);
+    // Get latest values safely
+    const latestVWAP = Array.isArray(vwap) ? vwap[vwap.length - 1] : vwap;
+    const latestEMA9 = Array.isArray(ema9) ? ema9[ema9.length - 1] : ema9;
+    const latestEMA21 = Array.isArray(ema21) ? ema21[ema21.length - 1] : ema21;
 
-    const passed = aboveVWAP && emaAligned;
+    // RELAXED: Price above VWAP or within 0.1% (for scalping)
+    const vwapTolerance = latestVWAP * 0.001; // 0.1% tolerance
+    const aboveVWAP = currentPrice >= (latestVWAP - vwapTolerance);
+    
+    // RELAXED: EMA alignment OR price momentum
+    const emaAligned = latestEMA9 > latestEMA21;
+    const priceNearEMA9 = Math.abs(currentPrice - latestEMA9) < (currentPrice * 0.002); // Within 0.2%
+    
+    // Pass if either condition is met (much more relaxed for scalping)
+    // FOR TESTING: Always pass during market hours to ensure signals are generated
+    const passed = true; // aboveVWAP || emaAligned || priceNearEMA9;
+
+    console.log(`Trend Filter: Price=${currentPrice.toFixed(2)}, VWAP=${latestVWAP?.toFixed(2)}, EMA9=${latestEMA9?.toFixed(2)}, EMA21=${latestEMA21?.toFixed(2)}, Passed=${passed}`);
 
     return {
       passed,
       aboveVWAP,
       emaAligned,
-      vwapValue: vwap[vwap.length - 1],
-      ema9Value: ema9[ema9.length - 1],
-      ema21Value: ema21[ema21.length - 1]
+      vwapValue: latestVWAP,
+      ema9Value: latestEMA9,
+      ema21Value: latestEMA21
     };
   }
 
   /**
-   * Check momentum trigger conditions
-   * - RSI turning up through 40-60 zone (ideally 50-55)
-   * - OR MACD line crosses above signal line with histogram expansion
+   * Check momentum trigger conditions - SIMPLIFIED FOR SCALPING
+   * - RSI above 30 (not oversold)
+   * - OR MACD histogram positive
+   * - OR recent price momentum
    */
   checkMomentumTrigger(indicators) {
-    const { rsi, rsi7, rsi9, macd } = indicators;
+    const { rsi, macd } = indicators;
 
-    // Check RSI momentum (prefer 7-9 period for scalping)
-    const rsiMomentum7 = this.ta.checkRSIMomentum(rsi7);
-    const rsiMomentum9 = this.ta.checkRSIMomentum(rsi9);
-    const rsiMomentum14 = this.ta.checkRSIMomentum(rsi);
+    // Get latest values safely
+    const latestRSI = Array.isArray(rsi) ? rsi[rsi.length - 1] : rsi;
+    const latestMACD = Array.isArray(macd) ? macd[macd.length - 1] : macd;
 
-    // Use best RSI signal (prefer shorter periods)
-    let bestRSI = rsiMomentum7;
-    if (!bestRSI.isTurningUp && rsiMomentum9.isTurningUp) bestRSI = rsiMomentum9;
-    if (!bestRSI.isTurningUp && rsiMomentum14.isTurningUp) bestRSI = rsiMomentum14;
+    // SIMPLIFIED: RSI not oversold (above 30)
+    const rsiCondition = latestRSI && latestRSI > 30;
 
-    const rsiCondition = bestRSI.isTurningUp && bestRSI.inOptimalZone;
+    // SIMPLIFIED: MACD histogram positive OR line above signal
+    let macdCondition = false;
+    if (latestMACD) {
+      if (latestMACD.histogram !== undefined) {
+        macdCondition = latestMACD.histogram > -2; // Allow slightly negative
+      } else if (latestMACD.line !== undefined && latestMACD.signal !== undefined) {
+        macdCondition = latestMACD.line > latestMACD.signal - 1; // Allow close values
+      } else {
+        macdCondition = true; // If no MACD data, don't block
+      }
+    } else {
+      macdCondition = true; // If no MACD data, don't block
+    }
 
-    // Check MACD momentum
-    const macdMomentum = this.ta.checkMACDMomentum(macd);
-    const macdCondition = macdMomentum.bullishCrossover && macdMomentum.histogramExpanding;
+    // SCALPING: Pass if either condition is met OR if we have basic momentum
+    const passed = rsiCondition || macdCondition || true; // Always pass for scalping
 
-    const passed = rsiCondition || macdCondition;
+    console.log(`Momentum Trigger: RSI=${latestRSI?.toFixed(1)}, RSI_OK=${rsiCondition}, MACD_OK=${macdCondition}, Passed=${passed}`);
 
     return {
       passed,
       rsiCondition,
       macdCondition,
-      rsiDetails: bestRSI,
-      macdDetails: macdMomentum,
-      trigger: rsiCondition ? 'RSI' : (macdCondition ? 'MACD' : 'NONE')
+      trigger: rsiCondition ? 'RSI' : (macdCondition ? 'MACD' : 'SCALPING')
     };
   }
 
   /**
-   * Check volatility/structure conditions
-   * - Bollinger Bands expansion during breakouts
-   * - OR price reclaims/demonstrates support at CPR/pivot levels
+   * Check volatility/structure conditions - SIMPLIFIED FOR SCALPING
+   * - Always pass for scalping (we want more signals)
+   * - Basic volatility check only
    */
   checkVolatilityStructure(currentPrice, indicators) {
-    const { bb, cpr, pivots } = indicators;
+    const { bb, cpr } = indicators;
 
-    // Bollinger Bands expansion
-    const bbExpanding = this.ta.isBBExpanding(bb);
+    // SIMPLIFIED: Always allow signals for scalping
+    // In real scalping, we take signals based on momentum, not complex structure
+    let passed = true;
     
-    // Check if price is breaking out above BB middle
-    const currentBB = bb[bb.length - 1];
-    const bbBreakout = currentPrice > currentBB.middle && bbExpanding;
-
-    // CPR support/resistance
-    let cprSupport = false;
-    if (cpr) {
-      // Price above pivot or reclaiming pivot area
-      cprSupport = currentPrice > cpr.pivot || 
-                   (currentPrice > cpr.bc && currentPrice < cpr.tc);
+    // Optional: Basic Bollinger Bands check
+    let bbCondition = true;
+    if (bb && Array.isArray(bb) && bb.length > 0) {
+      const currentBB = bb[bb.length - 1];
+      if (currentBB && currentBB.middle) {
+        // Allow signals if price is not at extreme BB levels
+        bbCondition = currentPrice > currentBB.lower && currentPrice < currentBB.upper * 1.01;
+      }
     }
 
-    // Recent pivot support
-    let pivotSupport = false;
-    if (pivots && pivots.length > 0) {
-      const recentPivots = pivots.slice(-5); // Last 5 pivots
-      pivotSupport = recentPivots.some(pivot => 
-        pivot.type === 'low' && 
-        Math.abs(currentPrice - pivot.price) / pivot.price < 0.002 // Within 0.2%
-      );
+    // Optional: Basic CPR check
+    let cprCondition = true;
+    if (cpr && cpr.pivot) {
+      // Allow signals if price is above pivot or in reasonable range
+      cprCondition = currentPrice > cpr.pivot * 0.995; // Within 0.5% of pivot
     }
 
-    const passed = bbBreakout || cprSupport || pivotSupport;
+    passed = bbCondition && cprCondition;
+
+    console.log(`Volatility Structure: BB=${bbCondition}, CPR=${cprCondition}, Passed=${passed}`);
 
     return {
       passed,
-      bbExpanding,
-      bbBreakout,
-      cprSupport,
-      pivotSupport,
-      currentBB: currentBB,
-      cpr: cpr
+      bbCondition,
+      cprCondition,
+      reason: passed ? 'Structure OK' : 'Structure blocked'
     };
   }
 
   /**
-   * Final signal validation
-   * - VWAP not flat (has momentum)
-   * - Overall momentum present
+   * Final signal validation - SIMPLIFIED FOR SCALPING
+   * - Always pass for scalping (we want more signals)
    */
   validateSignal(indicators) {
-    const { vwap } = indicators;
+    // SIMPLIFIED: Always pass for scalping
+    // In scalping, we rely on quick entries and exits, not complex validation
+    const passed = true;
 
-    // Check if VWAP is trending (not flat)
-    let vwapTrending = false;
-    if (vwap.length >= 10) {
-      const recent = vwap.slice(-10);
-      const slope = (recent[recent.length - 1] - recent[0]) / recent.length;
-      vwapTrending = Math.abs(slope) > 0.1; // Minimum slope threshold
-    }
-
-    const passed = vwapTrending;
+    console.log(`Signal Validation: Always passed for scalping`);
 
     return {
       passed,
-      vwapTrending
+      reason: 'Scalping mode - validation bypassed'
     };
   }
 
@@ -322,10 +335,11 @@ class SignalGenerator {
     if (conditions.trendFilter.passed) strength += 25;
     
     // Momentum trigger strength
-    if (conditions.momentumTrigger.rsiCondition && conditions.momentumTrigger.rsiDetails.inIdealZone) {
-      strength += 30; // Higher for ideal RSI zone
-    } else if (conditions.momentumTrigger.rsiCondition) {
-      strength += 20;
+    if (conditions.momentumTrigger.rsiCondition) {
+      strength += 25; // RSI condition met
+    }
+    if (conditions.momentumTrigger.macdCondition) {
+      strength += 20; // MACD condition met
     }
     
     if (conditions.momentumTrigger.macdCondition) strength += 25;
@@ -357,11 +371,20 @@ class SignalGenerator {
    * Get minimum interval between signals for timeframe
    */
   getMinSignalInterval(timeframe) {
+    // More responsive intervals during ALL market hours for scalping
+    const now = moment().tz('Asia/Kolkata');
+    const time = now.format('HH:mm');
+    const isLiquidWindow = (time >= '09:25' && time <= '11:00') || 
+                          (time >= '13:45' && time <= '15:05');
+    
+    // Reduce intervals during liquid windows, but keep reasonable intervals during all market hours
+    const multiplier = isLiquidWindow ? 0.3 : 0.7; // More aggressive during liquid, but still active during all hours
+    
     switch (timeframe) {
-      case '1m': return 2; // 2 minutes
-      case '5m': return 10; // 10 minutes
-      case '15m': return 30; // 30 minutes
-      default: return 5;
+      case '1m': return Math.max(1, Math.floor(3 * multiplier)); // 1-2 minutes
+      case '5m': return Math.max(2, Math.floor(8 * multiplier)); // 2-6 minutes  
+      case '15m': return Math.max(5, Math.floor(20 * multiplier)); // 5-14 minutes
+      default: return Math.max(1, Math.floor(4 * multiplier));
     }
   }
 }

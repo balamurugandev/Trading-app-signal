@@ -1,22 +1,102 @@
-import React, { useState, useEffect } from 'react';
-import TradingDashboard from './components/TradingDashboard';
-import AdvancedTradingDashboard from './components/AdvancedTradingDashboard';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { BarChart3, Zap, Settings } from 'lucide-react';
+import io from 'socket.io-client';
 
-// Mock contexts for now to avoid dependency issues
-const MockSocketProvider = ({ children }) => children;
-const MockMarketDataProvider = ({ children }) => children;
-const MockSignalProvider = ({ children }) => children;
+// Import real contexts
+import { SocketProvider } from './contexts/SocketContext';
+import { MarketDataProvider } from './contexts/MarketDataContext';
+import { SignalProvider } from './contexts/SignalContext';
+
+// Lazy load components to avoid initial loading issues
+const TradingDashboard = React.lazy(() => import('./components/TradingDashboard'));
+const AdvancedTradingDashboard = React.lazy(() => import('./components/AdvancedTradingDashboard'));
+
+// Loading component
+const LoadingSpinner = ({ message = "Loading..." }) => (
+  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
+      <h2 className="text-2xl font-bold text-gray-800 mb-2">NSE Scalping Signals</h2>
+      <p className="text-gray-600">{message}</p>
+    </div>
+  </div>
+);
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Component Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 p-4 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
+            <h2 className="text-2xl font-bold text-red-800 mb-4">Something went wrong</h2>
+            <p className="text-gray-600 mb-4">
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Reload App
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function App() {
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [dashboardMode, setDashboardMode] = useState('standard'); // 'standard' or 'advanced'
+  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
     console.log('NSE Trading App starting...');
+    
+    // Initialize socket connection
+    const newSocket = io('http://localhost:3001', {
+      transports: ['websocket', 'polling'],
+      timeout: 5000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ Socket connected:', newSocket.id);
+      setConnectionStatus('connected');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
+      setConnectionStatus('disconnected');
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.log('❌ Socket connection error:', error.message);
+      setConnectionStatus('error');
+    });
+
+    setSocket(newSocket);
     
     // Simulate initialization
     setTimeout(() => {
@@ -24,34 +104,65 @@ function App() {
       // Try to connect to backend
       checkBackendConnection();
     }, 1000);
+
+    // Set up periodic connection check (every 30 seconds)
+    const connectionCheckInterval = setInterval(() => {
+      if (connectionStatus === 'error') {
+        console.log('🔄 Retrying backend connection...');
+        checkBackendConnection();
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(connectionCheckInterval);
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
   }, []);
 
   const checkBackendConnection = async () => {
+    setConnectionStatus('connecting');
+    
     try {
-      const response = await fetch('/api/health');
-      if (response.ok) {
-        setConnectionStatus('connected');
-        console.log('Backend connected successfully');
-      } else {
-        setConnectionStatus('error');
-        console.log('Backend connection failed');
+      console.log('🔍 Checking backend connection...');
+      
+      // Check main health endpoint
+      const healthController = new AbortController();
+      const healthTimeoutId = setTimeout(() => healthController.abort(), 5000);
+      
+      const healthResponse = await fetch('/api/health', { 
+        signal: healthController.signal 
+      });
+      clearTimeout(healthTimeoutId);
+      
+      if (!healthResponse.ok) {
+        throw new Error(`Health check failed: ${healthResponse.status}`);
       }
+      
+      // Check data API endpoints
+      const statusController = new AbortController();
+      const statusTimeoutId = setTimeout(() => statusController.abort(), 5000);
+      
+      const statusResponse = await fetch('/api/data/status', { 
+        signal: statusController.signal 
+      });
+      clearTimeout(statusTimeoutId);
+      if (!statusResponse.ok) {
+        console.warn('⚠️ Data API not available, but main server is running');
+      }
+      
+      setConnectionStatus('connected');
+      console.log('✅ Backend connected successfully');
+      
     } catch (error) {
       setConnectionStatus('error');
-      console.log('Backend not available, running in demo mode');
+      console.log('❌ Backend not available, running in demo mode:', error.message);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">NSE Scalping Signals</h2>
-          <p className="text-gray-600">Initializing trading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Initializing trading dashboard..." />;
   }
 
   const DashboardToggle = () => (
@@ -84,18 +195,22 @@ function App() {
   );
 
   return (
-    <MockSocketProvider>
-      <MockMarketDataProvider>
-        <MockSignalProvider>
-          <DashboardToggle />
-          {dashboardMode === 'standard' ? (
-            <TradingDashboard connectionStatus={connectionStatus} />
-          ) : (
-            <AdvancedTradingDashboard connectionStatus={connectionStatus} />
-          )}
-        </MockSignalProvider>
-      </MockMarketDataProvider>
-    </MockSocketProvider>
+    <ErrorBoundary>
+      <SocketProvider socket={socket}>
+        <MarketDataProvider>
+          <SignalProvider>
+            <DashboardToggle />
+            <Suspense fallback={<LoadingSpinner message={`Loading ${dashboardMode} dashboard...`} />}>
+              {dashboardMode === 'standard' ? (
+                <TradingDashboard connectionStatus={connectionStatus} />
+              ) : (
+                <AdvancedTradingDashboard connectionStatus={connectionStatus} />
+              )}
+            </Suspense>
+          </SignalProvider>
+        </MarketDataProvider>
+      </SocketProvider>
+    </ErrorBoundary>
   );
 }
 
