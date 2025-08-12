@@ -147,12 +147,6 @@ class DemoDataGenerator {
 // Create singleton instance
 const demoDataGenerator = new DemoDataGenerator();
 
-// Auto-start in development mode
-if (process.env.NODE_ENV === 'development') {
-  // Start after a short delay to allow components to mount
-  setTimeout(() => {
-    demoDataGenerator.start();
-  }, 2000);
-}
+// Don't auto-start - let components control when to start demo data
 
 export default demoDataGenerator;
