@@ -1,10 +1,14 @@
-import React, { Component } from 'react';
+import React from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { useMarketData } from '../contexts/MarketDataContext';
 import { useSignals } from '../contexts/SignalContext';
+import { useHighFrequencyData } from '../hooks/useHighFrequencyData';
+import demoDataGenerator from '../services/demoDataGenerator';
+import dataUpdateService from '../services/dataUpdateService';
 import Header from './layout/Header';
 import OptimizedSidebar from './layout/OptimizedSidebar';
 import SignalGrid from './signals/SignalGrid';
+import PerformanceMonitor from './PerformanceMonitor';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Activity, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
@@ -15,12 +19,27 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
   const { symbols: marketData } = useMarketData();
   const { signals, updateSignalStatus, getSignalStats } = useSignals();
 
-  const [stats, setStats] = React.useState({
+  // High-frequency data hooks for real-time updates
+  const { 
+    data: realtimeSignals, 
+    pushData: pushSignalData, 
+    updateCount: signalUpdateCount 
+  } = useHighFrequencyData('signals', signals, { 
+    throttleMs: 16, // 60 FPS
+    priority: 1,
+    enableBatching: true 
+  });
+
+  const { 
+    data: realtimeStats, 
+    pushData: pushStatsData 
+  } = useHighFrequencyData('stats', {
     totalSignals: 0,
     activeSignals: 0,
     successRate: 0,
     totalPnL: 0
-  });
+  }, { throttleMs: 100 }); // Update stats less frequently
+
   const [loading, setLoading] = React.useState(true);
   const [lastUpdate, setLastUpdate] = React.useState(null);
   const [selectedSymbol, setSelectedSymbol] = React.useState('ALL');
@@ -56,19 +75,42 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
       setLoading(false);
     }, 2000);
 
-    return () => clearTimeout(timer);
+    // Subscribe to demo data updates
+    const unsubscribeNewSignal = dataUpdateService.subscribe('newSignal', (signal) => {
+      console.log('📨 Received new signal:', signal);
+      // In a real app, this would be handled by the SignalContext
+    });
+
+    const unsubscribeMarketData = dataUpdateService.subscribe('marketData', (data) => {
+      // Handle market data updates
+      console.log('📈 Market data update received');
+    });
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribeNewSignal();
+      unsubscribeMarketData();
+    };
   }, []);
 
-  // Calculate stats whenever signals change
+  // Calculate stats whenever signals change and push to high-frequency service
   React.useEffect(() => {
     const signalStats = getSignalStats();
-    setStats({
+    const newStats = {
       totalSignals: signalStats.total,
       activeSignals: signalStats.active,
       successRate: parseFloat(signalStats.winRate),
       totalPnL: signalStats.totalPnL
-    });
-  }, [signals, getSignalStats]);
+    };
+    
+    // Push stats to high-frequency service
+    pushStatsData(newStats);
+  }, [signals, getSignalStats, pushStatsData]);
+
+  // Push signals to high-frequency service whenever they change
+  React.useEffect(() => {
+    pushSignalData(signals);
+  }, [signals, pushSignalData]);
 
   const handleSymbolFilter = React.useCallback((symbol) => {
     setSelectedSymbol(symbol);
@@ -86,18 +128,19 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
   }, [updateSignalStatus]);
 
   const filteredSignals = React.useMemo(() => {
-    return signals.filter(signal => {
+    const signalsToFilter = realtimeSignals || signals;
+    return signalsToFilter.filter(signal => {
       const symbolMatch = selectedSymbol === 'ALL' || signal.symbol === selectedSymbol;
       const timeframeMatch = signal.timeframe === timeframe;
       return symbolMatch && timeframeMatch;
     });
-  }, [signals, selectedSymbol, timeframe]);
+  }, [realtimeSignals, signals, selectedSymbol, timeframe]);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header 
         connectionStatus={connectionStatus}
-        stats={stats}
+        stats={realtimeStats}
         lastUpdate={lastUpdate}
       />
       
@@ -117,7 +160,8 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Signals</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalSignals}</p>
+                  <p className="text-2xl font-bold text-gray-900">{realtimeStats.totalSignals}</p>
+                  <p className="text-xs text-gray-500">{signalUpdateCount}/s updates</p>
                 </div>
                 <Activity className="h-8 w-8 text-blue-600" />
               </div>
@@ -127,7 +171,7 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Active Signals</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.activeSignals}</p>
+                  <p className="text-2xl font-bold text-orange-600">{realtimeStats.activeSignals}</p>
                 </div>
                 <Clock className="h-8 w-8 text-orange-600" />
               </div>
@@ -137,7 +181,7 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.successRate}%</p>
+                  <p className="text-2xl font-bold text-green-600">{realtimeStats.successRate}%</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-600" />
               </div>
@@ -147,11 +191,11 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total P&L</p>
-                  <p className={`text-2xl font-bold ${stats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {stats.totalPnL >= 0 ? '+' : ''}{stats.totalPnL}%
+                  <p className={`text-2xl font-bold ${realtimeStats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {realtimeStats.totalPnL >= 0 ? '+' : ''}{realtimeStats.totalPnL}%
                   </p>
                 </div>
-                <AlertTriangle className={`h-8 w-8 ${stats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+                <AlertTriangle className={`h-8 w-8 ${realtimeStats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`} />
               </div>
             </Card>
           </div>
@@ -180,6 +224,9 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
           </Card>
         </main>
       </div>
+      
+      {/* Performance Monitor */}
+      <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} />
     </div>
   );
 };
