@@ -3,21 +3,21 @@ import { useSocket } from './SocketContext';
 
 const SignalContext = createContext();
 
-// Sample signals for testing
+// Sample signals for testing based on official closing prices
 const sampleSignals = [
   {
     id: 'sample_1',
     symbol: 'NIFTY',
     timeframe: '5m',
     type: 'BUY',
-    entryPrice: 24350.50,
-    stopLoss: 24320.00,
-    target1: 24380.00,
-    target2: 24410.00,
+    entryPrice: 24485.50,
+    stopLoss: 24455.00,
+    target1: 24515.00,
+    target2: 24545.00,
     strength: 75,
     status: 'active',
     timestamp: Date.now() - 300000, // 5 minutes ago
-    optionStrike: 24350,
+    optionStrike: 24500,
     riskReward: '1:2',
     pnl: 0,
     receivedAt: new Date(Date.now() - 300000).toISOString()
@@ -27,10 +27,10 @@ const sampleSignals = [
     symbol: 'BANKNIFTY',
     timeframe: '1m',
     type: 'SELL',
-    entryPrice: 55000.00,
-    stopLoss: 55050.00,
-    target1: 54950.00,
-    target2: 54900.00,
+    entryPrice: 55050.00,
+    stopLoss: 55100.00,
+    target1: 55000.00,
+    target2: 54950.00,
     strength: 82,
     status: 'hit_target',
     timestamp: Date.now() - 600000, // 10 minutes ago
@@ -38,7 +38,7 @@ const sampleSignals = [
     riskReward: '1:2',
     pnl: 2.5,
     receivedAt: new Date(Date.now() - 600000).toISOString(),
-    exitPrice: 54950.00,
+    exitPrice: 55000.00,
     exitTime: new Date(Date.now() - 300000).toISOString()
   },
   {
@@ -46,18 +46,18 @@ const sampleSignals = [
     symbol: 'NIFTY',
     timeframe: '15m',
     type: 'BUY',
-    entryPrice: 24340.00,
-    stopLoss: 24310.00,
-    target1: 24370.00,
-    target2: 24400.00,
+    entryPrice: 24480.00,
+    stopLoss: 24450.00,
+    target1: 24510.00,
+    target2: 24540.00,
     strength: 68,
     status: 'hit_stop',
     timestamp: Date.now() - 900000, // 15 minutes ago
-    optionStrike: 24350,
+    optionStrike: 24500,
     riskReward: '1:2',
     pnl: -1.2,
     receivedAt: new Date(Date.now() - 900000).toISOString(),
-    exitPrice: 24310.00,
+    exitPrice: 24450.00,
     exitTime: new Date(Date.now() - 600000).toISOString()
   }
 ];

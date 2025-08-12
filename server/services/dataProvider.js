@@ -196,8 +196,8 @@ class DataProvider {
   initializeDemoData() {
     const symbols = ['NIFTY', 'BANKNIFTY'];
     const baseValues = {
-      'NIFTY': 24400,
-      'BANKNIFTY': 55000
+      'NIFTY': 24487.40,
+      'BANKNIFTY': 55043.70
     };
 
     symbols.forEach(symbol => {
@@ -217,8 +217,8 @@ class DataProvider {
    */
   updateDemoBasePrices() {
     const baseValues = {
-      'NIFTY': 24400,
-      'BANKNIFTY': 55000
+      'NIFTY': 24487.40,
+      'BANKNIFTY': 55043.70
     };
 
     ['NIFTY', 'BANKNIFTY'].forEach(symbol => {

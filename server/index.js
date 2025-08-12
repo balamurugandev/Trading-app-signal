@@ -63,9 +63,9 @@ const executionQualityService = new ExecutionQualityService();
 let isMarketOpen = false;
 let currentSession = null;
 
-// VIX data cache for realistic changes
+// VIX data cache for realistic changes - using official closing value
 let vixCache = {
-  value: 15.25,
+  value: 12.23,
   lastUpdate: Date.now()
 };
 
@@ -638,7 +638,7 @@ app.get('/api/data/current/:symbol', (req, res) => {
       }
       
       const currentVix = vixCache.value;
-      const change = currentVix - 15.25; // Change from base value
+      const change = currentVix - 12.23; // Change from official closing value
       
       data = {
         symbol: 'VIX',

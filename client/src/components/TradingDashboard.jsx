@@ -684,19 +684,19 @@ const TradingDashboard = ({ connectionStatus }) => {
     const [totalSignalsCount, setTotalSignalsCount] = useState(0);
     const [winRate, setWinRate] = useState(0);
     const [marketData, setMarketData] = useState(() => {
-        // Always initialize with realistic last closing values
+        // Always initialize with official closing values
         // Demo mode will override these if needed
         return {
-            NIFTY: { price: 24363.30, change: -232.85, changePercent: -0.95, lastUpdate: new Date(), dataSource: 'last_close' },
-            BANKNIFTY: { price: 55004.90, change: -516.25, changePercent: -0.93, lastUpdate: new Date(), dataSource: 'last_close' }
+            NIFTY: { price: 24487.40, change: -97.65, changePercent: -0.40, lastUpdate: new Date(), dataSource: 'last_close' },
+            BANKNIFTY: { price: 55043.70, change: -467.05, changePercent: -0.84, lastUpdate: new Date(), dataSource: 'last_close' }
         };
     });
     const [vixData, setVixData] = useState(() => {
-        // Initialize with last known VIX values
+        // Initialize with official VIX closing values
         return {
-            value: 15.25,
-            change: -0.85,
-            changePercent: -5.28
+            value: 12.23,
+            change: 0.01,
+            changePercent: 0.08
         };
     });
 
@@ -767,12 +767,12 @@ const TradingDashboard = ({ connectionStatus }) => {
                 }
             };
         }
-        // Return last known technical indicator values
+        // Return technical indicator values based on official closing prices
         return {
             '1m': {
-                vwap: 24350.45,
-                ema9: 24345.30,
-                ema21: 24340.75,
+                vwap: 24485.45,
+                ema9: 24485.30,
+                ema21: 24480.75,
                 rsi: 45.2,
                 macd: {
                     line: -15.25,
@@ -780,16 +780,16 @@ const TradingDashboard = ({ connectionStatus }) => {
                     histogram: -1.43
                 },
                 bb: {
-                    upper: 24385.50,
-                    middle: 24350.00,
-                    lower: 24314.50,
+                    upper: 24520.50,
+                    middle: 24487.40,
+                    lower: 24454.30,
                     width: 0.61
                 }
             },
             '5m': {
-                vwap: 24348.25,
-                ema9: 24342.75,
-                ema21: 24338.50,
+                vwap: 24486.25,
+                ema9: 24485.75,
+                ema21: 24483.50,
                 rsi: 42.8,
                 macd: {
                     line: -12.45,
@@ -797,16 +797,16 @@ const TradingDashboard = ({ connectionStatus }) => {
                     histogram: -0.63
                 },
                 bb: {
-                    upper: 24380.25,
-                    middle: 24350.00,
-                    lower: 24319.75,
+                    upper: 24518.25,
+                    middle: 24487.40,
+                    lower: 24456.55,
                     width: 0.56
                 }
             },
             '15m': {
-                vwap: 24345.80,
-                ema9: 24340.20,
-                ema21: 24335.15,
+                vwap: 24485.80,
+                ema9: 24485.20,
+                ema21: 24482.15,
                 rsi: 38.7,
                 macd: {
                     line: -9.85,
@@ -814,20 +814,20 @@ const TradingDashboard = ({ connectionStatus }) => {
                     histogram: 0.27
                 },
                 bb: {
-                    upper: 24375.25,
-                    middle: 24350.00,
-                    lower: 24324.75,
+                    upper: 24515.25,
+                    middle: 24487.40,
+                    lower: 24459.55,
                     width: 0.52
                 }
             },
             cpr: {
-                pivot: 24350.00,
-                bc: 24365.50,
-                tc: 24334.50,
-                r1: 24380.00,
-                r2: 24395.50,
-                s1: 24320.00,
-                s2: 24304.50
+                pivot: 24487.40,
+                bc: 24502.90,
+                tc: 24471.90,
+                r1: 24518.40,
+                r2: 24533.90,
+                s1: 24456.40,
+                s2: 24440.90
             }
         };
     });
@@ -1077,10 +1077,10 @@ const TradingDashboard = ({ connectionStatus }) => {
         console.log('🔄 Mode switching useEffect triggered:', { isDemoMode, isLiveMode });
         if (!isDemoMode) {
             // Initialize with last closing values when switching to live mode
-            console.log('📊 Setting initial live mode data...');
+            console.log('📊 Setting initial live mode data with official closing prices...');
             setMarketData({
-                NIFTY: { price: 24363.30, change: -232.85, changePercent: -0.95, lastUpdate: new Date(), dataSource: 'last_close' },
-                BANKNIFTY: { price: 55004.90, change: -516.25, changePercent: -0.93, lastUpdate: new Date(), dataSource: 'last_close' }
+                NIFTY: { price: 24487.40, change: -97.65, changePercent: -0.40, lastUpdate: new Date(), dataSource: 'last_close' },
+                BANKNIFTY: { price: 55043.70, change: -467.05, changePercent: -0.84, lastUpdate: new Date(), dataSource: 'last_close' }
             });
             
             // Immediately try to fetch live data
@@ -1166,15 +1166,15 @@ const TradingDashboard = ({ connectionStatus }) => {
             setTotalSignalsCount(0);
             setWinRate(0);
         } else {
-            // Initialize demo data when switching to demo mode
+            // Initialize demo data when switching to demo mode (using realistic values around closing prices)
             setMarketData({
-                NIFTY: { price: 21520.35, change: +15.25, changePercent: +0.07, lastUpdate: new Date(), dataSource: 'demo' },
-                BANKNIFTY: { price: 46180.50, change: -25.75, changePercent: -0.06, lastUpdate: new Date(), dataSource: 'demo' }
+                NIFTY: { price: 24490.35, change: +2.95, changePercent: +0.012, lastUpdate: new Date(), dataSource: 'demo' },
+                BANKNIFTY: { price: 55050.50, change: +6.80, changePercent: +0.012, lastUpdate: new Date(), dataSource: 'demo' }
             });
             setVixData({
-                value: 15.25,
-                change: -0.85,
-                changePercent: -5.28
+                value: 12.25,
+                change: +0.02,
+                changePercent: +0.16
             });
             setTechnicalIndicators({
                 '1m': {

@@ -49,8 +49,8 @@ class DemoDataGenerator {
     const timeframe = timeframes[Math.floor(Math.random() * timeframes.length)];
     const type = types[Math.floor(Math.random() * types.length)];
     
-    const basePrice = symbol === 'NIFTY' ? 19500 : 
-                     symbol === 'BANKNIFTY' ? 45000 : 
+    const basePrice = symbol === 'NIFTY' ? 24487.40 : 
+                     symbol === 'BANKNIFTY' ? 55043.70 : 
                      symbol === 'FINNIFTY' ? 19000 : 65000;
     
     const entryPrice = basePrice + (Math.random() - 0.5) * 1000;
@@ -86,8 +86,8 @@ class DemoDataGenerator {
     const symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX'];
     
     symbols.forEach(symbol => {
-      const basePrice = symbol === 'NIFTY' ? 19500 : 
-                       symbol === 'BANKNIFTY' ? 45000 : 
+      const basePrice = symbol === 'NIFTY' ? 24487.40 : 
+                       symbol === 'BANKNIFTY' ? 55043.70 : 
                        symbol === 'FINNIFTY' ? 19000 : 65000;
       
       const price = basePrice + (Math.random() - 0.5) * 200;
@@ -121,7 +121,7 @@ class DemoDataGenerator {
     const signalUpdate = {
       id: `demo_${Math.floor(Math.random() * this.signalId)}`,
       status,
-      exitPrice: Math.random() * 1000 + 19000,
+      exitPrice: Math.random() * 200 + 24400, // More realistic exit prices around NIFTY
       pnl: (Math.random() - 0.3) * 10, // Slightly biased towards profit
       exitTime: new Date().toISOString()
     };
