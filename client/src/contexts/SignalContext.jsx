@@ -3,10 +3,69 @@ import { useSocket } from './SocketContext';
 
 const SignalContext = createContext();
 
+// Sample signals for testing
+const sampleSignals = [
+  {
+    id: 'sample_1',
+    symbol: 'NIFTY',
+    timeframe: '5m',
+    type: 'BUY',
+    entryPrice: 24350.50,
+    stopLoss: 24320.00,
+    target1: 24380.00,
+    target2: 24410.00,
+    strength: 75,
+    status: 'active',
+    timestamp: Date.now() - 300000, // 5 minutes ago
+    optionStrike: 24350,
+    riskReward: '1:2',
+    pnl: 0,
+    receivedAt: new Date(Date.now() - 300000).toISOString()
+  },
+  {
+    id: 'sample_2',
+    symbol: 'BANKNIFTY',
+    timeframe: '1m',
+    type: 'SELL',
+    entryPrice: 55000.00,
+    stopLoss: 55050.00,
+    target1: 54950.00,
+    target2: 54900.00,
+    strength: 82,
+    status: 'hit_target',
+    timestamp: Date.now() - 600000, // 10 minutes ago
+    optionStrike: 55000,
+    riskReward: '1:2',
+    pnl: 2.5,
+    receivedAt: new Date(Date.now() - 600000).toISOString(),
+    exitPrice: 54950.00,
+    exitTime: new Date(Date.now() - 300000).toISOString()
+  },
+  {
+    id: 'sample_3',
+    symbol: 'NIFTY',
+    timeframe: '15m',
+    type: 'BUY',
+    entryPrice: 24340.00,
+    stopLoss: 24310.00,
+    target1: 24370.00,
+    target2: 24400.00,
+    strength: 68,
+    status: 'hit_stop',
+    timestamp: Date.now() - 900000, // 15 minutes ago
+    optionStrike: 24350,
+    riskReward: '1:2',
+    pnl: -1.2,
+    receivedAt: new Date(Date.now() - 900000).toISOString(),
+    exitPrice: 24310.00,
+    exitTime: new Date(Date.now() - 600000).toISOString()
+  }
+];
+
 const initialState = {
-  signals: [],
-  activeSignals: [],
-  signalHistory: [],
+  signals: sampleSignals,
+  activeSignals: sampleSignals.filter(s => s.status === 'active'),
+  signalHistory: sampleSignals,
   filters: {
     symbols: ['NIFTY', 'BANKNIFTY'],
     timeframes: ['1m', '5m', '15m'],

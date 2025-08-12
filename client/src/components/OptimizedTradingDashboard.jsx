@@ -2,13 +2,15 @@ import React from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { useMarketData } from '../contexts/MarketDataContext';
 import { useSignals } from '../contexts/SignalContext';
+import demoDataGenerator from '../services/demoDataGenerator';
 import Header from './layout/Header';
 import OptimizedSidebar from './layout/OptimizedSidebar';
 import SignalGrid from './signals/SignalGrid';
 import PerformanceMonitor from './PerformanceMonitor';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Activity, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
+import { Button } from './ui/button';
+import { Activity, TrendingUp, AlertTriangle, Clock, Database, Zap } from 'lucide-react';
 
 // Functional component with hooks for better performance
 const OptimizedTradingDashboard = ({ connectionStatus }) => {
@@ -20,6 +22,7 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
     const [lastUpdate, setLastUpdate] = React.useState(null);
     const [selectedSymbol, setSelectedSymbol] = React.useState('ALL');
     const [timeframe, setTimeframe] = React.useState('1m');
+    const [isDemoMode, setIsDemoMode] = React.useState(false);
     const [stats, setStats] = React.useState({
         totalSignals: 0,
         activeSignals: 0,
@@ -95,6 +98,20 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
 
     const handleTimeframeChange = React.useCallback((tf) => {
         setTimeframe(tf);
+    }, []);
+
+    const toggleDemoMode = React.useCallback(() => {
+        setIsDemoMode(prev => {
+            const newDemoMode = !prev;
+            if (newDemoMode) {
+                console.log('🎮 Starting demo mode in optimized dashboard');
+                demoDataGenerator.start();
+            } else {
+                console.log('📡 Stopping demo mode in optimized dashboard');
+                demoDataGenerator.stop();
+            }
+            return newDemoMode;
+        });
     }, []);
 
     const handleSignalUpdate = React.useCallback((signal) => {
@@ -178,17 +195,46 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
                         </Card>
                     </div>
 
-                    {/* Filter Info */}
-                    <div className="flex items-center space-x-4 mb-4">
-                        <Badge variant="outline" className="text-sm">
-                            Symbol: {selectedSymbol}
-                        </Badge>
-                        <Badge variant="outline" className="text-sm">
-                            Timeframe: {timeframe}
-                        </Badge>
-                        <Badge variant="outline" className="text-sm">
-                            Showing: {filteredSignals.length} signals
-                        </Badge>
+                    {/* Filter Info and Demo Mode Toggle */}
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-4">
+                            <Badge variant="outline" className="text-sm">
+                                Symbol: {selectedSymbol}
+                            </Badge>
+                            <Badge variant="outline" className="text-sm">
+                                Timeframe: {timeframe}
+                            </Badge>
+                            <Badge variant="outline" className="text-sm">
+                                Showing: {filteredSignals.length} signals
+                            </Badge>
+                            {isDemoMode && (
+                                <Badge className="bg-blue-100 text-blue-800 text-sm">
+                                    <Database className="h-3 w-3 mr-1" />
+                                    Demo Mode
+                                </Badge>
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                            <Button
+                                variant={isDemoMode ? "default" : "outline"}
+                                size="sm"
+                                onClick={toggleDemoMode}
+                                className="flex items-center space-x-1"
+                            >
+                                {isDemoMode ? (
+                                    <>
+                                        <Database className="h-4 w-4" />
+                                        <span>Demo Mode</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap className="h-4 w-4" />
+                                        <span>Live Mode</span>
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Main Signal Grid */}
