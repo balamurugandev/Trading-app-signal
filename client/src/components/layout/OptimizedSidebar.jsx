@@ -18,7 +18,8 @@ const OptimizedSidebar = memo(({
   timeframe, 
   onSymbolChange, 
   onTimeframeChange,
-  marketData = {} 
+  marketData = {},
+  liveMarketData = {}
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -26,18 +27,32 @@ const OptimizedSidebar = memo(({
   const timeframes = useMemo(() => ['1m', '3m', '5m', '15m', '1h'], []);
 
   const getMarketStatus = useCallback((symbol) => {
+    // Check if it's a crypto symbol with live data
+    if ((symbol === 'BITCOIN' || symbol === 'SOLANA') && liveMarketData[symbol]) {
+      const liveData = liveMarketData[symbol];
+      return {
+        price: liveData.price || '--',
+        change: liveData.change || 0,
+        changePercent: liveData.changePercent || 0,
+        isLive: true,
+        lastUpdate: liveData.lastUpdate
+      };
+    }
+
+    // Use context data for other symbols
     const data = marketData[symbol];
     if (!data || !data['1m'] || !data['1m'].data) {
-      return { price: '--', change: 0, changePercent: 0 };
+      return { price: '--', change: 0, changePercent: 0, isLive: false };
     }
     
     const symbolData = data['1m'].data;
     return {
       price: symbolData.close || '--',
       change: symbolData.change || 0,
-      changePercent: symbolData.changePercent || 0
+      changePercent: symbolData.changePercent || 0,
+      isLive: false
     };
-  }, [marketData]);
+  }, [marketData, liveMarketData]);
 
   const handleCollapse = useCallback(() => {
     setIsCollapsed(prev => !prev);
@@ -180,8 +195,11 @@ const OptimizedSidebar = memo(({
                 <div className="flex items-center space-x-2">
                   <div className={`w-2 h-2 rounded-full ${
                     status.changePercent >= 0 ? 'bg-green-500' : 'bg-red-500'
-                  }`} />
+                  } ${status.isLive ? 'animate-pulse' : ''}`} />
                   <span className="text-sm font-medium">{symbol}</span>
+                  {status.isLive && (
+                    <span className="text-xs bg-green-100 text-green-700 px-1 rounded">LIVE</span>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-mono">

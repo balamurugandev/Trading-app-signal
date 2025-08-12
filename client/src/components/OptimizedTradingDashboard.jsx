@@ -3,10 +3,12 @@ import { useSocket } from '../contexts/SocketContext';
 import { useMarketData } from '../contexts/MarketDataContext';
 import { useSignals } from '../contexts/SignalContext';
 import demoDataGenerator from '../services/demoDataGenerator';
+import cryptoDataService from '../services/cryptoDataService';
 import Header from './layout/Header';
 import OptimizedSidebar from './layout/OptimizedSidebar';
 import SignalGrid from './signals/SignalGrid';
 import PerformanceMonitor from './PerformanceMonitor';
+import MarketStatusIndicator from './MarketStatusIndicator';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -23,6 +25,7 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
     const [selectedSymbol, setSelectedSymbol] = React.useState('ALL');
     const [timeframe, setTimeframe] = React.useState('1m');
     const [isDemoMode, setIsDemoMode] = React.useState(false);
+    const [liveMarketData, setLiveMarketData] = React.useState({});
     const [stats, setStats] = React.useState({
         totalSignals: 0,
         activeSignals: 0,
@@ -114,6 +117,33 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
         });
     }, []);
 
+    // Start crypto live data updates
+    React.useEffect(() => {
+        console.log('🚀 Starting crypto live data service');
+        cryptoDataService.start();
+
+        // Subscribe to crypto data updates
+        const unsubscribeBitcoin = cryptoDataService.subscribe('BITCOIN', (symbol, data) => {
+            setLiveMarketData(prev => ({
+                ...prev,
+                [symbol]: data
+            }));
+        });
+
+        const unsubscribeSolana = cryptoDataService.subscribe('SOLANA', (symbol, data) => {
+            setLiveMarketData(prev => ({
+                ...prev,
+                [symbol]: data
+            }));
+        });
+
+        return () => {
+            cryptoDataService.stop();
+            unsubscribeBitcoin();
+            unsubscribeSolana();
+        };
+    }, []);
+
     const handleSignalUpdate = React.useCallback((signal) => {
         if (signal.status && signal.id) {
             updateSignalStatus(signal.id, signal.status, signal.exitPrice, signal.pnl);
@@ -144,9 +174,13 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
                     onSymbolChange={handleSymbolFilter}
                     onTimeframeChange={handleTimeframeChange}
                     marketData={marketData}
+                    liveMarketData={liveMarketData}
                 />
 
                 <main className="flex-1 p-6 ml-64">
+                    {/* Market Status Indicator */}
+                    <MarketStatusIndicator />
+                    
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <Card className="p-4">
