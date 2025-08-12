@@ -51,7 +51,8 @@ class DemoDataGenerator {
     
     const basePrice = symbol === 'NIFTY' ? 24487.40 : 
                      symbol === 'BANKNIFTY' ? 55043.70 : 
-                     symbol === 'FINNIFTY' ? 19000 : 65000;
+                     symbol === 'FINNIFTY' ? 23245.80 : 
+                     symbol === 'SENSEX' ? 80604.65 : 19000;
     
     const entryPrice = basePrice + (Math.random() - 0.5) * 1000;
     const stopLoss = type === 'BUY' ? entryPrice * 0.995 : entryPrice * 1.005;
@@ -83,12 +84,15 @@ class DemoDataGenerator {
   }
 
   generateMarketData() {
-    const symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX'];
+    const symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BITCOIN', 'SOLANA'];
     
     symbols.forEach(symbol => {
       const basePrice = symbol === 'NIFTY' ? 24487.40 : 
                        symbol === 'BANKNIFTY' ? 55043.70 : 
-                       symbol === 'FINNIFTY' ? 19000 : 65000;
+                       symbol === 'FINNIFTY' ? 23245.80 : 
+                       symbol === 'SENSEX' ? 80604.65 :
+                       symbol === 'BITCOIN' ? 60245.50 :
+                       symbol === 'SOLANA' ? 185.75 : 19000;
       
       const price = basePrice + (Math.random() - 0.5) * 200;
       const change = (Math.random() - 0.5) * 100;

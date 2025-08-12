@@ -22,7 +22,7 @@ const OptimizedSidebar = memo(({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const symbols = useMemo(() => ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX'], []);
+  const symbols = useMemo(() => ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BITCOIN', 'SOLANA'], []);
   const timeframes = useMemo(() => ['1m', '3m', '5m', '15m', '1h'], []);
 
   const getMarketStatus = useCallback((symbol) => {
@@ -44,7 +44,7 @@ const OptimizedSidebar = memo(({
   }, []);
 
   const marketOverviewData = useMemo(() => {
-    return symbols.slice(0, 2).map(symbol => ({
+    return symbols.map(symbol => ({
       symbol,
       status: getMarketStatus(symbol)
     }));
@@ -169,27 +169,33 @@ const OptimizedSidebar = memo(({
           <Activity className="h-4 w-4 mr-2" />
           Market Overview
         </h3>
-        <div className="space-y-2">
-          {marketOverviewData.map(({ symbol, status }) => (
-            <div key={symbol} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  status.changePercent >= 0 ? 'bg-green-500' : 'bg-red-500'
-                }`} />
-                <span className="text-sm font-medium">{symbol}</span>
-              </div>
-              <div className="text-right">
-                <div className="text-xs font-mono">
-                  ₹{typeof status.price === 'number' ? status.price.toFixed(2) : status.price}
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {symbols.map((symbol) => {
+            const status = getMarketStatus(symbol);
+            const isCrypto = symbol === 'BITCOIN' || symbol === 'SOLANA';
+            const currencySymbol = isCrypto ? '$' : '₹';
+            
+            return (
+              <div key={symbol} className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    status.changePercent >= 0 ? 'bg-green-500' : 'bg-red-500'
+                  }`} />
+                  <span className="text-sm font-medium">{symbol}</span>
                 </div>
-                <div className={`text-xs ${
-                  status.changePercent >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {status.changePercent >= 0 ? '+' : ''}{status.changePercent.toFixed(2)}%
+                <div className="text-right">
+                  <div className="text-xs font-mono">
+                    {currencySymbol}{typeof status.price === 'number' ? status.price.toFixed(2) : status.price}
+                  </div>
+                  <div className={`text-xs ${
+                    status.changePercent >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {status.changePercent >= 0 ? '+' : ''}{status.changePercent.toFixed(2)}%
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -203,10 +209,6 @@ const OptimizedSidebar = memo(({
           <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
             <span className="text-sm text-blue-700">Active Signals</span>
             <Badge className="bg-blue-100 text-blue-800">--</Badge>
-          </div>
-          <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-            <span className="text-sm text-green-700">Success Rate</span>
-            <Badge className="bg-green-100 text-green-800">--%</Badge>
           </div>
           <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
             <span className="text-sm text-yellow-700">Avg. Hold Time</span>

@@ -194,10 +194,14 @@ class DataProvider {
    * Initialize demo data with realistic NSE patterns
    */
   initializeDemoData() {
-    const symbols = ['NIFTY', 'BANKNIFTY'];
+    const symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BITCOIN', 'SOLANA'];
     const baseValues = {
       'NIFTY': 24487.40,
-      'BANKNIFTY': 55043.70
+      'BANKNIFTY': 55043.70,
+      'FINNIFTY': 23245.80,
+      'SENSEX': 80604.65,
+      'BITCOIN': 60245.50,
+      'SOLANA': 185.75
     };
 
     symbols.forEach(symbol => {
@@ -218,10 +222,14 @@ class DataProvider {
   updateDemoBasePrices() {
     const baseValues = {
       'NIFTY': 24487.40,
-      'BANKNIFTY': 55043.70
+      'BANKNIFTY': 55043.70,
+      'FINNIFTY': 23245.80,
+      'SENSEX': 80604.65,
+      'BITCOIN': 60245.50,
+      'SOLANA': 185.75
     };
 
-    ['NIFTY', 'BANKNIFTY'].forEach(symbol => {
+    ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BITCOIN', 'SOLANA'].forEach(symbol => {
       const demoState = this.demoData.get(symbol);
       if (demoState) {
         demoState.basePrice = baseValues[symbol];

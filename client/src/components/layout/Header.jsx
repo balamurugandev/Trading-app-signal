@@ -110,20 +110,6 @@ const Header = memo(({ connectionStatus, stats = {}, lastUpdate }) => {
             <span className="text-gray-600">Active:</span>
             <span className="font-semibold text-orange-600">{stats.activeSignals || 0}</span>
           </div>
-          
-          <div className="flex items-center space-x-1 text-sm">
-            <TrendingUp className="h-4 w-4 text-green-600" />
-            <span className="text-gray-600">Success:</span>
-            <span className="font-semibold text-green-600">{stats.successRate || 0}%</span>
-          </div>
-          
-          <div className="flex items-center space-x-1 text-sm">
-            <AlertTriangle className={`h-4 w-4 ${pnlColor}`} />
-            <span className="text-gray-600">P&L:</span>
-            <span className={`font-semibold ${pnlColor}`}>
-              {(stats.totalPnL || 0) >= 0 ? '+' : ''}{stats.totalPnL || 0}%
-            </span>
-          </div>
         </div>
 
         {/* Right Section - Status and Controls */}

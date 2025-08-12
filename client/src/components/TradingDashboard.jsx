@@ -688,7 +688,11 @@ const TradingDashboard = ({ connectionStatus }) => {
         // Demo mode will override these if needed
         return {
             NIFTY: { price: 24487.40, change: -97.65, changePercent: -0.40, lastUpdate: new Date(), dataSource: 'last_close' },
-            BANKNIFTY: { price: 55043.70, change: -467.05, changePercent: -0.84, lastUpdate: new Date(), dataSource: 'last_close' }
+            BANKNIFTY: { price: 55043.70, change: -467.05, changePercent: -0.84, lastUpdate: new Date(), dataSource: 'last_close' },
+            FINNIFTY: { price: 23245.80, change: -85.20, changePercent: -0.37, lastUpdate: new Date(), dataSource: 'last_close' },
+            SENSEX: { price: 80604.65, change: -318.45, changePercent: -0.39, lastUpdate: new Date(), dataSource: 'last_close' },
+            BITCOIN: { price: 60245.50, change: 1250.30, changePercent: 2.12, lastUpdate: new Date(), dataSource: 'last_close' },
+            SOLANA: { price: 185.75, change: 8.45, changePercent: 4.76, lastUpdate: new Date(), dataSource: 'last_close' }
         };
     });
     const [vixData, setVixData] = useState(() => {
@@ -1080,7 +1084,11 @@ const TradingDashboard = ({ connectionStatus }) => {
             console.log('📊 Setting initial live mode data with official closing prices...');
             setMarketData({
                 NIFTY: { price: 24487.40, change: -97.65, changePercent: -0.40, lastUpdate: new Date(), dataSource: 'last_close' },
-                BANKNIFTY: { price: 55043.70, change: -467.05, changePercent: -0.84, lastUpdate: new Date(), dataSource: 'last_close' }
+                BANKNIFTY: { price: 55043.70, change: -467.05, changePercent: -0.84, lastUpdate: new Date(), dataSource: 'last_close' },
+                FINNIFTY: { price: 23245.80, change: -85.20, changePercent: -0.37, lastUpdate: new Date(), dataSource: 'last_close' },
+                SENSEX: { price: 80604.65, change: -318.45, changePercent: -0.39, lastUpdate: new Date(), dataSource: 'last_close' },
+                BITCOIN: { price: 60245.50, change: 1250.30, changePercent: 2.12, lastUpdate: new Date(), dataSource: 'last_close' },
+                SOLANA: { price: 185.75, change: 8.45, changePercent: 4.76, lastUpdate: new Date(), dataSource: 'last_close' }
             });
             
             // Immediately try to fetch live data
@@ -1169,7 +1177,11 @@ const TradingDashboard = ({ connectionStatus }) => {
             // Initialize demo data when switching to demo mode (using realistic values around closing prices)
             setMarketData({
                 NIFTY: { price: 24490.35, change: +2.95, changePercent: +0.012, lastUpdate: new Date(), dataSource: 'demo' },
-                BANKNIFTY: { price: 55050.50, change: +6.80, changePercent: +0.012, lastUpdate: new Date(), dataSource: 'demo' }
+                BANKNIFTY: { price: 55050.50, change: +6.80, changePercent: +0.012, lastUpdate: new Date(), dataSource: 'demo' },
+                FINNIFTY: { price: 23250.25, change: +4.45, changePercent: +0.019, lastUpdate: new Date(), dataSource: 'demo' },
+                SENSEX: { price: 80620.15, change: +15.50, changePercent: +0.019, lastUpdate: new Date(), dataSource: 'demo' },
+                BITCOIN: { price: 60380.75, change: +135.25, changePercent: +0.22, lastUpdate: new Date(), dataSource: 'demo' },
+                SOLANA: { price: 187.25, change: +1.50, changePercent: +0.81, lastUpdate: new Date(), dataSource: 'demo' }
             });
             setVixData({
                 value: 12.25,

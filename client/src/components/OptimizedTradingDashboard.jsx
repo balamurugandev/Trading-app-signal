@@ -148,7 +148,7 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
 
                 <main className="flex-1 p-6 ml-64">
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <Card className="p-4">
                             <div className="flex items-center justify-between">
                                 <div>
@@ -169,28 +169,6 @@ const OptimizedTradingDashboard = ({ connectionStatus }) => {
                                     <p className="text-2xl font-bold text-orange-600">{stats.activeSignals}</p>
                                 </div>
                                 <Clock className="h-8 w-8 text-orange-600" />
-                            </div>
-                        </Card>
-
-                        <Card className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                                    <p className="text-2xl font-bold text-green-600">{stats.successRate}%</p>
-                                </div>
-                                <TrendingUp className="h-8 w-8 text-green-600" />
-                            </div>
-                        </Card>
-
-                        <Card className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Total P&L</p>
-                                    <p className={`text-2xl font-bold ${stats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {stats.totalPnL >= 0 ? '+' : ''}{stats.totalPnL}%
-                                    </p>
-                                </div>
-                                <AlertTriangle className={`h-8 w-8 ${stats.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`} />
                             </div>
                         </Card>
                     </div>
