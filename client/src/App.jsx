@@ -12,6 +12,7 @@ import { SignalProvider } from './contexts/SignalContext';
 // Lazy load components to avoid initial loading issues
 const TradingDashboard = React.lazy(() => import('./components/TradingDashboard'));
 const AdvancedTradingDashboard = React.lazy(() => import('./components/AdvancedTradingDashboard'));
+const OptimizedTradingDashboard = React.lazy(() => import('./components/OptimizedTradingDashboard'));
 
 // Loading component
 const LoadingSpinner = ({ message = "Loading..." }) => (
@@ -66,7 +67,7 @@ class ErrorBoundary extends React.Component {
 function App() {
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const [dashboardMode, setDashboardMode] = useState('standard'); // 'standard' or 'advanced'
+  const [dashboardMode, setDashboardMode] = useState('optimized'); // 'standard', 'advanced', or 'optimized'
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
@@ -168,6 +169,15 @@ function App() {
   const DashboardToggle = () => (
     <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-2 bg-white rounded-lg p-3 shadow-xl border border-gray-200 backdrop-blur-sm">
       <Button
+        variant={dashboardMode === 'optimized' ? "default" : "ghost"}
+        size="sm"
+        onClick={() => setDashboardMode('optimized')}
+        className="flex items-center space-x-1 text-sm"
+      >
+        <Zap className="h-4 w-4" />
+        <span>Optimized</span>
+      </Button>
+      <Button
         variant={dashboardMode === 'standard' ? "default" : "ghost"}
         size="sm"
         onClick={() => setDashboardMode('standard')}
@@ -182,13 +192,13 @@ function App() {
         onClick={() => setDashboardMode('advanced')}
         className="flex items-center space-x-1 text-sm"
       >
-        <Zap className="h-4 w-4" />
+        <Settings className="h-4 w-4" />
         <span>Advanced</span>
       </Button>
-      {dashboardMode === 'advanced' && (
-        <Badge className="bg-emerald-500 text-white text-xs animate-pulse">
-          <Settings className="h-3 w-3 mr-1" />
-          Pro
+      {dashboardMode === 'optimized' && (
+        <Badge className="bg-blue-500 text-white text-xs animate-pulse">
+          <Zap className="h-3 w-3 mr-1" />
+          Fast
         </Badge>
       )}
     </div>
@@ -201,7 +211,9 @@ function App() {
           <SignalProvider>
             <DashboardToggle />
             <Suspense fallback={<LoadingSpinner message={`Loading ${dashboardMode} dashboard...`} />}>
-              {dashboardMode === 'standard' ? (
+              {dashboardMode === 'optimized' ? (
+                <OptimizedTradingDashboard connectionStatus={connectionStatus} />
+              ) : dashboardMode === 'standard' ? (
                 <TradingDashboard connectionStatus={connectionStatus} />
               ) : (
                 <AdvancedTradingDashboard connectionStatus={connectionStatus} />
