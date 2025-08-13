@@ -135,6 +135,14 @@ class MarketStatusService {
     return this.currentStatus;
   }
 
+  getIndianMarketStatus() {
+    return this.currentStatus.indian;
+  }
+
+  getCryptoMarketStatus() {
+    return this.currentStatus.crypto;
+  }
+
   destroy() {
     if (this.statusInterval) {
       clearInterval(this.statusInterval);

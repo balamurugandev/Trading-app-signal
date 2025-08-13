@@ -6,7 +6,11 @@ class YahooFinanceProvider extends EventEmitter {
         super();
         this.symbols = {
             'NIFTY': '^NSEI',
-            'BANKNIFTY': '^NSEBANK'
+            'BANKNIFTY': '^NSEBANK',
+            'FINNIFTY': '^CNXFIN',
+            'SENSEX': '^BSESN',
+            'BITCOIN': 'BTC-USD',
+            'SOLANA': 'SOL-USD'
         };
         this.updateInterval = 5000; // 5 seconds
         this.isRunning = false;
@@ -103,19 +107,29 @@ class YahooFinanceProvider extends EventEmitter {
             const timestamps = result.timestamp;
             const quotes = result.indicators.quote[0];
 
-            // Determine market status
-            const isMarketOpen = meta.marketState === 'REGULAR';
-            const currentTime = new Date();
-            const istTime = new Date(currentTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-            const hour = istTime.getHours();
-            const day = istTime.getDay();
-            const isWeekend = day === 0 || day === 6;
-            const isMarketHours = hour >= 9 && hour <= 15 && !isWeekend;
+            // Determine market status - crypto markets are always open
+            const isCrypto = symbol === 'BITCOIN' || symbol === 'SOLANA';
+            let isMarketOpen, isMarketHours;
+            
+            if (isCrypto) {
+                // Crypto markets are 24/7
+                isMarketOpen = true;
+                isMarketHours = true;
+            } else {
+                // Equity markets have specific hours
+                isMarketOpen = meta.marketState === 'REGULAR';
+                const currentTime = new Date();
+                const istTime = new Date(currentTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                const hour = istTime.getHours();
+                const day = istTime.getDay();
+                const isWeekend = day === 0 || day === 6;
+                isMarketHours = hour >= 9 && hour <= 15 && !isWeekend;
+            }
 
             let currentPrice, volume, timestamp;
             
-            if (isMarketOpen && isMarketHours) {
-                // Market is open - use latest data
+            if ((isMarketOpen && isMarketHours) || isCrypto) {
+                // Market is open or crypto - use latest data
                 const latestIndex = timestamps.length - 1;
                 currentPrice = quotes.close[latestIndex] || meta.regularMarketPrice;
                 volume = quotes.volume[latestIndex] || meta.regularMarketVolume;
@@ -160,18 +174,18 @@ class YahooFinanceProvider extends EventEmitter {
                 changePercent: changePercent,
                 previousClose: previousClose,
                 timestamp: timestamp,
-                marketState: meta.marketState,
-                isMarketOpen: isMarketOpen && isMarketHours,
+                marketState: isCrypto ? 'REGULAR' : meta.marketState,
+                isMarketOpen: (isMarketOpen && isMarketHours) || isCrypto,
                 isMarketHours: isMarketHours,
                 // Additional data for technical analysis
                 ohlcData: this.extractOHLCData(timestamps, quotes),
                 lastUpdate: new Date(),
                 // Market session info
                 sessionInfo: {
-                    isWeekend: isWeekend,
-                    currentHour: hour,
-                    marketState: meta.marketState,
-                    dataSource: isMarketOpen && isMarketHours ? 'live' : 'last_close'
+                    isWeekend: isCrypto ? false : (new Date().getDay() === 0 || new Date().getDay() === 6),
+                    currentHour: new Date().getHours(),
+                    marketState: isCrypto ? 'REGULAR' : meta.marketState,
+                    dataSource: ((isMarketOpen && isMarketHours) || isCrypto) ? 'live' : 'last_close'
                 }
             };
 
@@ -183,9 +197,20 @@ class YahooFinanceProvider extends EventEmitter {
             this.emit('marketData', marketData);
             this.emit(`marketData:${symbol}`, marketData);
 
-            const statusIcon = isMarketOpen && isMarketHours ? '🔴' : '🟡';
-            const dataSource = isMarketOpen && isMarketHours ? 'LIVE' : 'CLOSE';
-            console.log(`${statusIcon} ${symbol}: ₹${currentPrice.toFixed(2)} (${change >= 0 ? '+' : ''}${change.toFixed(2)}, ${changePercent.toFixed(2)}%) [${dataSource}]`);
+
+            
+            const statusIcon = ((isMarketOpen && isMarketHours) || isCrypto) ? '🔴' : '🟡';
+            const dataSource = ((isMarketOpen && isMarketHours) || isCrypto) ? 'LIVE' : 'CLOSE';
+            const formattedPrice = isCrypto ? 
+                `$${currentPrice.toFixed(2)}` : 
+                `₹${currentPrice.toFixed(2)}`;
+            
+            // Safe logging with null checks
+            if (currentPrice && typeof currentPrice === 'number') {
+                console.log(`${statusIcon} ${symbol}: ${formattedPrice} (${change >= 0 ? '+' : ''}${change.toFixed(2)}, ${changePercent.toFixed(2)}%) [${dataSource}]`);
+            } else {
+                console.log(`${statusIcon} ${symbol}: Invalid price data [${dataSource}]`);
+            }
 
         } catch (error) {
             console.error(`❌ Error fetching ${symbol} data:`, error.message);

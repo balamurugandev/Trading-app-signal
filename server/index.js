@@ -156,7 +156,7 @@ io.on('connection', (socket) => {
 
 // Market data processing and signal generation
 async function processMarketData() {
-  if (!isMarketOpen) return;
+  // Always process data - will get live data during market hours, last close otherwise
   
   const symbols = ['NIFTY', 'BANKNIFTY'];
   const timeframes = ['1m', '5m', '15m'];
@@ -181,7 +181,7 @@ async function processMarketData() {
         const isLiquidWindow = (time >= '09:25' && time <= '11:00') || 
                               (time >= '13:45' && time <= '15:05');
         
-        if (!isWeekend && isMarketHours && isLiquidWindow) {
+        if (!isWeekend && isMarketHours) {
           const signal = signalGenerator.generateSignal(
             symbol, 
             timeframe, 
@@ -252,27 +252,24 @@ cron.schedule('* * * * *', () => {
   }
 });
 
-// Real-time data processing and signal generation (every 1 second during market hours)
+// Real-time data processing and signal generation (every 1 second)
 cron.schedule('* * * * * *', () => {
-  if (isMarketOpen) {
-    processMarketData();
-    
-    // Generate signals every 5 seconds during ALL market hours (not just liquid windows)
-    const now = moment().tz('Asia/Kolkata');
-    const time = now.format('HH:mm');
-    const second = now.second();
-    
-    // Check for signals every 5 seconds during ALL market hours
-    if (second % 5 === 0) {
-      generateRealTimeSignals();
-    }
+  const now = moment().tz('Asia/Kolkata');
+  const second = now.second();
+  
+  // Always process market data (will get live data during market hours, demo data otherwise)
+  processMarketData();
+  
+  // Generate signals every 10 seconds (more frequent for scalping)
+  if (second % 10 === 0) {
+    generateRealTimeSignals();
   }
 });
 
 // Function to generate real-time signals
 async function generateRealTimeSignals() {
   const symbols = ['NIFTY', 'BANKNIFTY'];
-  const timeframes = ['1m', '5m'];
+  const timeframes = ['1m', '5m', '15m']; // Added 15m for more signal opportunities
   
   for (const symbol of symbols) {
     for (const timeframe of timeframes) {
@@ -493,9 +490,67 @@ app.get('/api/advanced/safety-rails', (req, res) => {
   });
 });
 
+// Force generate signals for testing (bypasses all restrictions)
+app.post('/api/signals/force-generate', async (req, res) => {
+  try {
+    console.log('🚨 FORCE GENERATING SIGNALS FOR TESTING');
+    
+    const symbols = ['NIFTY', 'BANKNIFTY'];
+    const timeframes = ['1m', '5m', '15m'];
+    const generatedSignals = [];
+    
+    for (const symbol of symbols) {
+      for (const timeframe of timeframes) {
+        try {
+          const marketData = await dataProvider.getLatestData(symbol, timeframe);
+          if (marketData && marketData.length >= 20) {
+            const indicators = technicalAnalysis.calculateIndicators(marketData);
+            
+            // Force generate a signal by temporarily clearing the last signal time
+            const signalKey = `${symbol}_${timeframe}`;
+            signalGenerator.lastSignals.delete(signalKey);
+            
+            const signal = signalGenerator.generateSignal(symbol, timeframe, marketData, indicators);
+            
+            if (signal) {
+              generatedSignals.push({ symbol, timeframe, signal });
+              
+              // Emit to connected clients
+              io.emit('newSignal', {
+                symbol,
+                timeframe,
+                signal,
+                timestamp: moment().tz('Asia/Kolkata').toISOString(),
+                isLive: true,
+                priority: 'high',
+                forced: true
+              });
+              
+              console.log(`✅ Force generated signal: ${symbol} ${timeframe}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error force generating signal for ${symbol} ${timeframe}:`, error);
+        }
+      }
+    }
+    
+    res.json({
+      success: true,
+      generatedSignals: generatedSignals.length,
+      signals: generatedSignals,
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Force signal generation error:', error);
+    res.status(500).json({ error: 'Failed to force generate signals' });
+  }
+});
+
 
 // Generate signal for specific symbol and timeframe (GET version for easy testing)
-app.get('/api/signals/generate/:symbol/:timeframe', (req, res) => {
+app.get('/api/signals/generate/:symbol/:timeframe', async (req, res) => {
   try {
     const { symbol, timeframe } = req.params;
     
@@ -508,7 +563,26 @@ app.get('/api/signals/generate/:symbol/:timeframe', (req, res) => {
     }
     
     console.log(`API: Generating signal for ${symbol} ${timeframe}`);
-    const signal = advancedSignalEngine.generateAdvancedSignal(symbol, timeframe);
+    
+    // Try both signal generators
+    let signal = null;
+    
+    // First try the regular signal generator
+    try {
+      const marketData = await dataProvider.getLatestData(symbol, timeframe);
+      if (marketData && marketData.length >= 50) {
+        const indicators = technicalAnalysis.calculateIndicators(marketData);
+        signal = signalGenerator.generateSignal(symbol, timeframe, marketData, indicators);
+      }
+    } catch (error) {
+      console.log('Regular signal generator failed:', error.message);
+    }
+    
+    // If no signal from regular generator, try advanced
+    if (!signal) {
+      signal = advancedSignalEngine.generateAdvancedSignal(symbol, timeframe);
+    }
+    
     console.log(`API: Signal generated:`, signal ? 'SUCCESS' : 'NULL');
     
     if (!signal) {
@@ -605,13 +679,72 @@ app.post('/api/data/disable-live', (req, res) => {
   }
 });
 
+// Get all current market data
+app.get('/api/data/current', (req, res) => {
+  try {
+    const allData = dataProvider.getAllCurrentData();
+    
+    // Add VIX data
+    const now = moment().tz('Asia/Kolkata');
+    const hour = now.hour();
+    const minute = now.minute();
+    const day = now.day();
+    const isWeekend = day === 0 || day === 6;
+    const isMarketHours = (hour > 9 || (hour === 9 && minute >= 15)) && (hour < 15 || (hour === 15 && minute <= 30));
+    const isMarketOpen = !isWeekend && isMarketHours;
+    
+    const timeSinceLastUpdate = now.valueOf() - vixCache.lastUpdate;
+    const shouldUpdate = timeSinceLastUpdate > 1000;
+    
+    if (shouldUpdate) {
+      const volatilityFactor = isMarketOpen ? (Math.random() - 0.5) * 0.2 : (Math.random() - 0.5) * 0.05;
+      const newVix = Math.max(10, Math.min(30, vixCache.value + volatilityFactor));
+      
+      vixCache = {
+        value: newVix,
+        lastUpdate: now.valueOf()
+      };
+    }
+    
+    const currentVix = vixCache.value;
+    const change = currentVix - 12.23;
+    
+    allData.VIX = {
+      symbol: 'VIX',
+      ltp: parseFloat(currentVix.toFixed(2)),
+      change: parseFloat(change.toFixed(2)),
+      changePercent: parseFloat(((change / currentVix) * 100).toFixed(2)),
+      volume: Math.floor(Math.random() * 1000000),
+      timestamp: now.toISOString(),
+      isMarketOpen: isMarketOpen,
+      dataSource: isMarketOpen ? 'live' : 'last_close'
+    };
+    
+    console.log(`📊 API: Returning data for ${Object.keys(allData).length} symbols`);
+    
+    res.json({
+      data: allData,
+      isLive: dataProvider.getLiveDataStatus().isLiveMode,
+      marketStatus: dataProvider.getMarketStatus(),
+      timestamp: now.toISOString()
+    });
+  } catch (error) {
+    console.error('❌ API Error getting all current data:', error.message);
+    res.status(500).json({
+      error: error.message,
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+  }
+});
+
 app.get('/api/data/current/:symbol', (req, res) => {
   try {
     const { symbol } = req.params;
+    const symbolUpper = symbol.toUpperCase();
     let data;
     
     // Handle VIX specially
-    if (symbol.toUpperCase() === 'VIX') {
+    if (symbolUpper === 'VIX') {
       // Generate realistic VIX data
       const now = moment().tz('Asia/Kolkata');
       const hour = now.hour();
@@ -629,7 +762,6 @@ app.get('/api/data/current/:symbol', (req, res) => {
       if (shouldUpdate) {
         const volatilityFactor = isMarketOpen ? (Math.random() - 0.5) * 0.2 : (Math.random() - 0.5) * 0.05;
         const newVix = Math.max(10, Math.min(30, vixCache.value + volatilityFactor));
-        const change = newVix - vixCache.value;
         
         vixCache = {
           value: newVix,
@@ -642,30 +774,42 @@ app.get('/api/data/current/:symbol', (req, res) => {
       
       data = {
         symbol: 'VIX',
-        ltp: currentVix,
-        change: change,
-        changePercent: (change / currentVix) * 100,
+        ltp: parseFloat(currentVix.toFixed(2)),
+        change: parseFloat(change.toFixed(2)),
+        changePercent: parseFloat(((change / currentVix) * 100).toFixed(2)),
         volume: Math.floor(Math.random() * 1000000),
         timestamp: now.toISOString(),
-        isMarketOpen: isMarketOpen
+        isMarketOpen: isMarketOpen,
+        dataSource: isMarketOpen ? 'live' : 'last_close'
       };
     } else {
-      data = dataProvider.getCurrentMarketData(symbol.toUpperCase());
+      // Get data from data provider
+      data = dataProvider.getCurrentMarketData(symbolUpper);
+      
+      // Log the request for debugging
+      console.log(`🌐 API Request for ${symbolUpper}: ${data ? 'SUCCESS' : 'NO DATA'}`);
     }
     
     if (!data) {
+      console.log(`❌ No data available for symbol: ${symbolUpper}`);
       return res.status(404).json({
         error: `No data available for symbol: ${symbol}`,
+        availableSymbols: ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BITCOIN', 'SOLANA', 'VIX'],
         timestamp: moment().tz('Asia/Kolkata').toISOString()
       });
     }
     
-    res.json({
+    const response = {
       data,
       isLive: dataProvider.getLiveDataStatus().isLiveMode,
       timestamp: moment().tz('Asia/Kolkata').toISOString()
-    });
+    };
+    
+    console.log(`✅ API Response for ${symbolUpper}: ${data.ltp} (${data.dataSource || 'unknown'})`);
+    
+    res.json(response);
   } catch (error) {
+    console.error(`❌ API Error for ${symbol}:`, error.message);
     res.status(500).json({
       error: error.message,
       timestamp: moment().tz('Asia/Kolkata').toISOString()

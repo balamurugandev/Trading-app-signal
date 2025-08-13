@@ -263,9 +263,9 @@ const initialState = {
     SOLANA: {
       '1m': { 
         data: {
-          close: 185.75,
-          change: 8.45,
-          changePercent: 4.76,
+          close: 181.82,
+          change: 1.97,
+          changePercent: 1.07,
           volume: 8500,
           timestamp: Date.now()
         }, 
@@ -279,9 +279,9 @@ const initialState = {
       },
       '5m': { 
         data: {
-          close: 185.75,
-          change: 8.45,
-          changePercent: 4.76,
+          close: 181.82,
+          change: 1.97,
+          changePercent: 1.07,
           volume: 7200,
           timestamp: Date.now()
         }, 
@@ -295,9 +295,9 @@ const initialState = {
       },
       '15m': { 
         data: {
-          close: 185.75,
-          change: 8.45,
-          changePercent: 4.76,
+          close: 181.82,
+          change: 1.97,
+          changePercent: 1.07,
           volume: 6100,
           timestamp: Date.now()
         }, 

@@ -41,14 +41,23 @@ class DataProvider {
       
       // Set up event listeners
       this.yahooProvider.on('marketData', (data) => {
-        console.log(`📊 Live update: ${data.symbol} - ₹${data.ltp.toFixed(2)} (${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)})`);
+        const currency = data.symbol === 'BITCOIN' || data.symbol === 'SOLANA' ? '$' : '₹';
+        console.log(`📊 Live update: ${data.symbol} - ${currency}${data.ltp.toFixed(2)} (${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)}) [${(data.dataSource || data.sessionInfo?.dataSource || 'UNKNOWN').toUpperCase()}]`);
         
         // Clear cache for this symbol to force fresh data
         this.clearSymbolCache(data.symbol);
       });
 
       this.yahooProvider.on('error', (error) => {
-        console.error(`❌ Yahoo Finance error for ${error.symbol}:`, error.error);
+        if (error.error.includes('429') || error.error.includes('Too Many Requests')) {
+          console.warn(`⚠️ Yahoo Finance rate limited for ${error.symbol} - using fallback data`);
+        } else {
+          console.error(`❌ Yahoo Finance error for ${error.symbol}:`, error.error);
+        }
+      });
+
+      this.yahooProvider.on('fetchError', (error) => {
+        console.warn(`⚠️ Yahoo Finance fetch error: ${error.error}`);
       });
 
       // Start the provider with timeout
@@ -57,7 +66,7 @@ class DataProvider {
       
       // Add a timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Yahoo Finance provider start timeout (30s)')), 30000);
+        setTimeout(() => reject(new Error('Yahoo Finance provider start timeout (45s)')), 45000);
       });
       
       await Promise.race([startPromise, timeoutPromise]);
@@ -68,10 +77,15 @@ class DataProvider {
       }
       
       console.log('✅ Yahoo Finance provider started successfully');
+      console.log('ℹ️ Note: If you see rate limiting errors, the system will use realistic fallback data');
       
     } catch (error) {
       console.error('❌ Failed to initialize live data:', error.message);
-      console.error('Stack trace:', error.stack);
+      
+      // Don't throw error - instead fall back to demo mode gracefully
+      console.log('🎮 Falling back to demo mode due to initialization failure');
+      this.isLiveMode = false;
+      this.demoMode = true;
       
       // Clean up on failure
       if (this.yahooProvider) {
@@ -81,9 +95,6 @@ class DataProvider {
           console.error('Error stopping provider:', stopError.message);
         }
       }
-      
-      // Re-throw the error instead of silently falling back
-      throw error;
     }
   }
 
@@ -489,67 +500,85 @@ class DataProvider {
    * Get current live market data
    */
   getCurrentMarketData(symbol) {
-    if (this.isLiveMode && !this.demoMode) {
+    // In live mode, ONLY return live data - no fallbacks to demo data
+    if (this.isLiveMode && !this.demoMode && this.yahooProvider) {
       const liveData = this.yahooProvider.getLatestData(symbol);
       if (liveData) {
+        console.log(`📊 Live data for ${symbol}: ₹${liveData.ltp} (${liveData.sessionInfo?.dataSource || 'live'})`);
         return {
           symbol: liveData.symbol,
           ltp: liveData.ltp,
           change: liveData.change,
           changePercent: liveData.changePercent,
-          volume: Math.max(liveData.volume || 0, 10000), // Ensure volume is always positive
+          volume: Math.max(liveData.volume || 0, 1000),
           timestamp: liveData.timestamp,
-          isMarketOpen: liveData.isMarketOpen
+          isMarketOpen: liveData.isMarketOpen,
+          dataSource: liveData.sessionInfo?.dataSource || 'live',
+          marketState: liveData.marketState
         };
+      } else {
+        console.log(`❌ No live data available for ${symbol} - returning null`);
+        return null; // Don't fallback to demo data in live mode
       }
     }
     
-    // Generate highly dynamic demo data for live trading simulation
-    const demoState = this.demoData.get(symbol);
-    if (!demoState) return null;
+    // Only use demo data when explicitly in demo mode
+    if (this.demoMode) {
+      const demoState = this.demoData.get(symbol);
+      if (!demoState) {
+        console.log(`❌ No demo state for ${symbol}`);
+        return null;
+      }
+      
+      const basePrice = demoState.basePrice;
+      const now = Date.now();
+      
+      // Create realistic price movements around base price
+      const timeBasedVariation = Math.sin(now / 10000) * (basePrice * 0.001);
+      const randomVariation = (Math.random() - 0.5) * (basePrice * 0.002);
+      const trendVariation = Math.sin(now / 60000) * (basePrice * 0.0015);
+      
+      const currentPrice = basePrice + timeBasedVariation + randomVariation + trendVariation;
+      const previousPrice = demoState.lastPrice || basePrice;
+      const change = currentPrice - previousPrice;
+      
+      demoState.lastPrice = currentPrice;
+      
+      console.log(`💹 ${symbol} Demo Price: ${currentPrice.toFixed(2)} (Change: ${change.toFixed(2)})`);
+      
+      return {
+        symbol,
+        ltp: parseFloat(currentPrice.toFixed(2)),
+        change: parseFloat(change.toFixed(2)),
+        changePercent: parseFloat(((change / currentPrice) * 100).toFixed(2)),
+        volume: Math.floor(Math.random() * 100000) + 10000,
+        timestamp: new Date(),
+        isMarketOpen: this.getMarketStatus().isOpen,
+        dataSource: 'demo'
+      };
+    }
     
-    const basePrice = demoState.basePrice;
-    const now = Date.now();
-    
-    // Create realistic price movements around base price
-    const timeBasedVariation = Math.sin(now / 10000) * 20; // Small oscillation
-    const randomVariation = (Math.random() - 0.5) * 10; // Small random movement
-    const trendVariation = Math.sin(now / 60000) * 30; // Small trend variation
-    
-    // Always calculate from base price to prevent drift
-    const currentPrice = basePrice + timeBasedVariation + randomVariation + trendVariation;
-    const previousPrice = demoState.lastPrice || basePrice;
-    const change = currentPrice - previousPrice;
-    
-    // Update the last price for next calculation
-    demoState.lastPrice = currentPrice;
-    
-    console.log(`💹 ${symbol} Dynamic Price: ${currentPrice.toFixed(2)} (Change: ${change.toFixed(2)})`);
-    
-    return {
-      symbol,
-      ltp: currentPrice,
-      change: change,
-      changePercent: (change / currentPrice) * 100,
-      volume: Math.floor(Math.random() * 100000) + 10000,
-      timestamp: new Date(),
-      isMarketOpen: this.getMarketStatus().isOpen
-    };
+    return null;
   }
 
   /**
    * Get all current market data
    */
   getAllCurrentData() {
-    if (this.isLiveMode && !this.demoMode) {
-      return this.yahooProvider.getAllData();
-    }
-    
-    // Return demo data for both symbols
     const data = {};
-    ['NIFTY', 'BANKNIFTY'].forEach(symbol => {
-      data[symbol] = this.getCurrentMarketData(symbol);
+    const symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BITCOIN', 'SOLANA'];
+    
+    symbols.forEach(symbol => {
+      const symbolData = this.getCurrentMarketData(symbol);
+      if (symbolData) {
+        data[symbol] = symbolData;
+      }
     });
+    
+    const dataCount = Object.keys(data).length;
+    const mode = this.isLiveMode && !this.demoMode ? 'live' : 'demo';
+    console.log(`📊 Returning ${mode} data for ${dataCount} symbols`);
+    
     return data;
   }
 

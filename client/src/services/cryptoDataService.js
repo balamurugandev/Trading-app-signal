@@ -14,9 +14,9 @@ class CryptoDataService {
     });
     
     this.cryptoData.set('SOLANA', {
-      price: 185.75,
-      change: 8.45,
-      changePercent: 4.76,
+      price: 181.82,
+      change: 1.97,
+      changePercent: 1.07,
       lastUpdate: Date.now()
     });
   }
@@ -44,6 +44,10 @@ class CryptoDataService {
     console.log('⏹️ Stopped crypto live data updates');
   }
 
+  getCurrentData(symbol) {
+    return this.cryptoData.get(symbol);
+  }
+
   updateCryptoPrices() {
     ['BITCOIN', 'SOLANA'].forEach(symbol => {
       const currentData = this.cryptoData.get(symbol);
@@ -55,7 +59,7 @@ class CryptoDataService {
       const newPrice = Math.max(currentData.price + priceChange, 1); // Prevent negative prices
       
       // Calculate change from base price
-      const basePrice = symbol === 'BITCOIN' ? 60245.50 : 185.75;
+      const basePrice = symbol === 'BITCOIN' ? 60245.50 : 181.82;
       const totalChange = newPrice - basePrice;
       const changePercent = (totalChange / basePrice) * 100;
 

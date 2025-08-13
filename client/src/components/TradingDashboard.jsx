@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import io from 'socket.io-client';
 import {
     Activity,
     TrendingUp,
@@ -318,20 +319,65 @@ const SignalFeed = ({ isDemoMode, selectedSymbol, currentMarketData, onActiveSig
                 clearInterval(interval);
             };
         } else {
-            // Clear signals when not in demo mode
+            // Live mode - connect to WebSocket for real signals
+            console.log('🔌 Connecting to WebSocket for live signals...');
+            const socket = io('http://localhost:3001');
+            
+            socket.on('connect', () => {
+                console.log('✅ Connected to signal server');
+                // Subscribe to both symbols
+                socket.emit('subscribeSymbol', 'NIFTY');
+                socket.emit('subscribeSymbol', 'BANKNIFTY');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('❌ Disconnected from signal server');
+            });
+            
+            // Listen for new signals
+            socket.on('newSignal', (signalData) => {
+                console.log('🚨 Received live signal:', signalData);
+                
+                if (signalData.signal) {
+                    // Create a properly formatted signal
+                    const newSignal = {
+                        id: `live_${Date.now()}`,
+                        symbol: signalData.symbol,
+                        timeframe: signalData.timeframe,
+                        type: signalData.signal.type || 'BUY',
+                        entryPrice: signalData.signal.entryPrice || signalData.signal.price,
+                        target1: signalData.signal.target1 || signalData.signal.entryPrice * 1.005,
+                        target2: signalData.signal.target2 || signalData.signal.entryPrice * 1.01,
+                        stopLoss: signalData.signal.stopLoss || signalData.signal.entryPrice * 0.995,
+                        strength: signalData.signal.strength || 75,
+                        confidence: signalData.signal.confidence || 'Medium',
+                        timestamp: new Date(signalData.timestamp || Date.now()),
+                        status: 'active',
+                        isLive: true
+                    };
+                    
+                    // Add to signals
+                    setDemoSignals(prev => {
+                        const updatedSignals = [newSignal, ...prev.slice(0, 9)]; // Keep last 10 signals
+                        return updatedSignals;
+                    });
+                    
+                    // Update counters
+                    setTotalSignalsGenerated(prev => prev + 1);
+                    
+                    console.log('✅ Added live signal to display');
+                }
+            });
+            
+            // Initialize with empty signals for live mode
             setDemoSignals([]);
             setTotalSignalsGenerated(0);
-            if (onActiveSignalsChange) {
-                onActiveSignalsChange(0);
-            }
-            if (onSignalStatsChange) {
-                onSignalStatsChange({
-                    total: 0,
-                    winRate: 0,
-                    completed: 0,
-                    successful: 0
-                });
-            }
+            
+            // Cleanup function
+            return () => {
+                console.log('🔌 Disconnecting from signal server');
+                socket.disconnect();
+            };
         }
     }, [isDemoMode]);
 
@@ -676,7 +722,17 @@ const TradingDashboard = ({ connectionStatus }) => {
         console.log(`🕐 Market Status Check: Hour=${hour}, Minute=${minute}, Day=${day}, Weekend=${isWeekend}, MarketHours=${isMarketHours}, ShouldBeLive=${shouldBeLive}`);
         return shouldBeLive;
     });
-    const [isDemoMode, setIsDemoMode] = useState(false); // Default to live mode, let user choose demo mode
+    const [isDemoMode, setIsDemoMode] = useState(false); // Start in live mode
+    const [isModeLocked, setIsModeLocked] = useState(true); // Lock the mode to prevent automatic switching
+    
+    // Initialize in live mode and lock it
+    useEffect(() => {
+        console.log('🔒 Initializing dashboard in locked live mode');
+        setIsDemoMode(false);
+        setIsModeLocked(true);
+    }, []);
+
+
     const [showSettings, setShowSettings] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [activeSignalsCount, setActiveSignalsCount] = useState(0);
@@ -887,6 +943,7 @@ const TradingDashboard = ({ connectionStatus }) => {
             console.log(`🔄 Update #${logCounter} at ${now.toLocaleTimeString()} - Mode: ${isLiveMode ? 'LIVE' : 'DEMO'}`);
 
             if (isDemoMode) {
+                console.log('📊 Updating demo market data...');
                 // Update demo market data
                 setMarketData(prev => {
                     const validatedNifty = validateMarketData({
@@ -953,7 +1010,8 @@ const TradingDashboard = ({ connectionStatus }) => {
                     };
                 });
                 
-            } else if (isLiveMode) {
+            } else {
+                // Not in demo mode - fetch live data or last close data
                 // Check if market is open for live updates
                 const now = new Date();
                 const istTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -964,8 +1022,9 @@ const TradingDashboard = ({ connectionStatus }) => {
                 const isMarketHours = (hour > 9 || (hour === 9 && minute >= 15)) && (hour < 15 || (hour === 15 && minute <= 30));
                 const isMarketOpen = !isWeekend && isMarketHours;
 
-                // Fetch live data during market hours
-                if (isMarketOpen) {
+                // Always fetch live data when not in demo mode (will get live or last close)
+                console.log(`🔄 Fetching data - Market Open: ${isMarketOpen}, Live Mode: ${isLiveMode}`);
+                if (true) { // Always fetch data when not in demo mode
                     console.log('🔴 Fetching live market data...');
                     
                     // Fetch live data, technical indicators, and VIX from server
@@ -1067,8 +1126,41 @@ const TradingDashboard = ({ connectionStatus }) => {
                         console.log('Keeping existing market data due to fetch error');
                     });
                 } else {
-                    // Market is closed - keep all data static (no updates)
-                    console.log('Market closed - keeping static data');
+                    // Market is closed - fetch last close data
+                    console.log('Market closed - fetching last close data');
+                    
+                    // Fetch live data even when market is closed (will get last close prices)
+                    Promise.all([
+                        fetch('/api/data/current/NIFTY').then(response => response.json()).catch(() => null),
+                        fetch('/api/data/current/BANKNIFTY').then(response => response.json()).catch(() => null)
+                    ]).then(([niftyResult, bankNiftyResult]) => {
+                        const newMarketData = { ...marketData };
+                        
+                        if (niftyResult?.data) {
+                            newMarketData.NIFTY = {
+                                price: niftyResult.data.ltp || marketData.NIFTY.price,
+                                change: niftyResult.data.change || marketData.NIFTY.change,
+                                changePercent: niftyResult.data.changePercent || marketData.NIFTY.changePercent,
+                                lastUpdate: new Date(niftyResult.data.timestamp || Date.now()),
+                                dataSource: 'last_close'
+                            };
+                        }
+                        
+                        if (bankNiftyResult?.data) {
+                            newMarketData.BANKNIFTY = {
+                                price: bankNiftyResult.data.ltp || marketData.BANKNIFTY.price,
+                                change: bankNiftyResult.data.change || marketData.BANKNIFTY.change,
+                                changePercent: bankNiftyResult.data.changePercent || marketData.BANKNIFTY.changePercent,
+                                lastUpdate: new Date(bankNiftyResult.data.timestamp || Date.now()),
+                                dataSource: 'last_close'
+                            };
+                        }
+                        
+                        setMarketData(newMarketData);
+                        console.log('📊 Updated with last close data:', newMarketData);
+                    }).catch(error => {
+                        console.error('Error fetching last close data:', error);
+                    });
                 }
             }
         }, updateInterval); // Dynamic interval: 1s for live market hours, 3s for demo/off-hours
@@ -1345,6 +1437,7 @@ const TradingDashboard = ({ connectionStatus }) => {
             
             try {
                 console.log('🎮 Switching to Demo mode...');
+                setIsModeLocked(false); // Unlock when user manually switches
                 
                 // Try to call the API, but don't fail if it's not available
                 try {
@@ -1392,6 +1485,7 @@ const TradingDashboard = ({ connectionStatus }) => {
             
             try {
                 console.log('📡 Switching to Live mode with Yahoo Finance...');
+                setIsModeLocked(true); // Lock in live mode when user manually switches
                 
                 // Try to call the API
                 try {
@@ -1454,22 +1548,24 @@ const TradingDashboard = ({ connectionStatus }) => {
                         variant={!isDemoMode ? "default" : "ghost"}
                         size="sm"
                         onClick={switchToLive}
-                        disabled={isToggling || connectionStatus !== 'connected'}
+                        disabled={isToggling}
                         className="flex items-center space-x-1"
-                        title={connectionStatus !== 'connected' ? 'Server connection required for live mode' : ''}
+                        title="Switch to live data mode"
                     >
                         <Zap className="h-4 w-4" />
                         <span>{isToggling && !isDemoMode ? 'Switching...' : 'Live (Yahoo)'}</span>
                     </Button>
                 </div>
-                {connectionStatus !== 'connected' && !isDemoMode && (
-                    <div className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
-                        ⚠️ Server required for live mode
-                    </div>
-                )}
-                {!isDemoMode && connectionStatus === 'connected' && (
-                    <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">
-                        ✅ Live data active
+                {!isDemoMode && (
+                    <div className={`text-xs px-2 py-1 rounded border ${
+                        connectionStatus === 'connected' 
+                            ? 'text-green-600 bg-green-50 border-green-200' 
+                            : 'text-yellow-600 bg-yellow-50 border-yellow-200'
+                    }`}>
+                        {connectionStatus === 'connected' 
+                            ? '✅ Live data active' 
+                            : '📊 Live mode - Last close data'}
+                        {isModeLocked && ' 🔒'}
                     </div>
                 )}
             </div>
@@ -1699,9 +1795,9 @@ const TradingDashboard = ({ connectionStatus }) => {
                                             </div>
                                         ) : (
                                             <div className="flex items-center space-x-1">
-                                                <div className={`w-2 h-2 rounded-full ${isLiveMode ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
-                                                <span className={`text-xs font-medium ${isLiveMode ? 'text-green-600' : 'text-yellow-600'}`}>
-                                                    {isLiveMode ? 'LIVE DATA' : 'DEMO MODE'}
+                                                <div className={`w-2 h-2 rounded-full ${!isDemoMode ? (isLiveMode ? 'bg-green-500 animate-pulse' : 'bg-yellow-500') : 'bg-blue-500'}`}></div>
+                                                <span className={`text-xs font-medium ${!isDemoMode ? (isLiveMode ? 'text-green-600' : 'text-yellow-600') : 'text-blue-600'}`}>
+                                                    {isDemoMode ? 'DEMO MODE' : (isLiveMode ? 'LIVE DATA' : 'LAST CLOSE')}
                                                 </span>
                                                 <span className="text-xs text-gray-500">
                                                     • {formatTime(currentTime)}
