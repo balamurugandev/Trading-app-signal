@@ -149,22 +149,22 @@ const DetailedSignalCard = ({ signal, onStatusUpdate, index, isDemoMode }) => {
               Signal Conditions
             </h4>
             <div className="flex flex-wrap gap-2">
-              {signal.conditions.trendFilter && (
+              {signal.conditions?.trendFilter && (
                 <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
                   ✓ Trend Filter
                 </Badge>
               )}
-              {signal.conditions.momentumTrigger !== 'NONE' && (
+              {signal.conditions?.momentumTrigger && signal.conditions.momentumTrigger !== 'NONE' && (
                 <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
                   ✓ {signal.conditions.momentumTrigger}
                 </Badge>
               )}
-              {signal.conditions.volatilityStructure && (
+              {signal.conditions?.volatilityStructure && (
                 <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300">
                   ✓ Structure
                 </Badge>
               )}
-              {signal.conditions.signalValidation && (
+              {signal.conditions?.signalValidation && (
                 <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
                   ✓ Validation
                 </Badge>
@@ -223,7 +223,7 @@ const DetailedSignalCard = ({ signal, onStatusUpdate, index, isDemoMode }) => {
                 <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                   <h5 className="text-sm font-medium text-yellow-800 mb-1">Trailing Stop:</h5>
                   <p className="text-xs text-yellow-700">
-                    Method: {signal.trailingStop.method} | Current: {formatPrice(signal.trailingStop.currentLevel)}
+                    Method: {signal.trailingStop?.method || 'EMA9'} | Current: {formatPrice(signal.trailingStop?.currentLevel || 0)}
                   </p>
                 </div>
               )}

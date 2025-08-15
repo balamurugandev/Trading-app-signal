@@ -50,10 +50,17 @@ const technicalAnalysis = new TechnicalAnalysis();
 const riskManager = new RiskManager();
 const signalGenerator = new SignalGenerator(technicalAnalysis, riskManager);
 
-// Initialize data provider
-dataProvider.initializeLiveData().catch(error => {
-  console.error('Failed to initialize live data:', error.message);
-});
+// Initialize data provider with environment variable check
+console.log('🔧 Environment LIVE_DATA:', process.env.LIVE_DATA);
+if (process.env.LIVE_DATA === 'true') {
+  console.log('🚀 Enabling live data mode from environment variable...');
+  dataProvider.enableLiveMode().catch(error => {
+    console.error('❌ Failed to enable live data mode:', error.message);
+    console.log('🎮 Falling back to demo mode');
+  });
+} else {
+  console.log('🎮 Starting in demo mode (LIVE_DATA not set to true)');
+}
 
 // Initialize advanced services
 const advancedSignalEngine = new AdvancedSignalEngine();
@@ -260,14 +267,17 @@ cron.schedule('* * * * * *', () => {
   // Always process market data (will get live data during market hours, demo data otherwise)
   processMarketData();
   
-  // Generate signals every 10 seconds (more frequent for scalping)
-  if (second % 10 === 0) {
+  // Generate signals every 60 seconds (once per minute)
+  if (second === 0) {
     generateRealTimeSignals();
   }
 });
 
 // Function to generate real-time signals
 async function generateRealTimeSignals() {
+  const now = moment().tz('Asia/Kolkata');
+  console.log(`🔍 Checking for signal opportunities at ${now.format('HH:mm:ss')}`);
+  
   const symbols = ['NIFTY', 'BANKNIFTY'];
   const timeframes = ['1m', '5m', '15m']; // Added 15m for more signal opportunities
   
@@ -641,6 +651,98 @@ app.get('/api/data/status', (req, res) => {
     marketStatus: dataProvider.getMarketStatus(),
     timestamp: moment().tz('Asia/Kolkata').toISOString()
   });
+});
+
+// Add the endpoints that the test script expects
+app.get('/api/data-status', (req, res) => {
+  const status = dataProvider.getLiveDataStatus();
+  res.json({
+    isLiveMode: status.isLiveMode,
+    isDemoMode: status.isDemoMode,
+    providerStatus: status.providerStatus,
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
+});
+
+app.get('/api/market-status', (req, res) => {
+  const marketStatus = dataProvider.getMarketStatus();
+  res.json({
+    isOpen: marketStatus.isOpen,
+    session: marketStatus.session,
+    displayMode: marketStatus.displayMode,
+    currentTime: marketStatus.currentTime,
+    nextOpen: marketStatus.nextOpen,
+    timeUntilOpen: marketStatus.timeUntilOpen,
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
+});
+
+app.get('/api/market-data', (req, res) => {
+  try {
+    const allData = dataProvider.getAllCurrentData();
+    
+    // Add VIX data
+    const now = moment().tz('Asia/Kolkata');
+    const hour = now.hour();
+    const minute = now.minute();
+    const day = now.day();
+    const isWeekend = day === 0 || day === 6;
+    const isMarketHours = (hour > 9 || (hour === 9 && minute >= 15)) && (hour < 15 || (hour === 15 && minute <= 30));
+    const isMarketOpen = !isWeekend && isMarketHours;
+    
+    const timeSinceLastUpdate = now.valueOf() - vixCache.lastUpdate;
+    const shouldUpdate = timeSinceLastUpdate > 1000;
+    
+    if (shouldUpdate) {
+      const volatilityFactor = isMarketOpen ? (Math.random() - 0.5) * 0.2 : (Math.random() - 0.5) * 0.05;
+      const newVix = Math.max(10, Math.min(30, vixCache.value + volatilityFactor));
+      
+      vixCache = {
+        value: newVix,
+        lastUpdate: now.valueOf()
+      };
+    }
+    
+    const currentVix = vixCache.value;
+    const change = currentVix - 12.23;
+    
+    allData.VIX = {
+      symbol: 'VIX',
+      ltp: parseFloat(currentVix.toFixed(2)),
+      change: parseFloat(change.toFixed(2)),
+      changePercent: parseFloat(((change / currentVix) * 100).toFixed(2)),
+      volume: Math.floor(Math.random() * 1000000),
+      timestamp: now.toISOString(),
+      isMarketOpen: isMarketOpen,
+      dataSource: isMarketOpen ? 'live' : 'last_close'
+    };
+    
+    res.json(allData);
+  } catch (error) {
+    console.error('❌ API Error getting market data:', error.message);
+    res.status(500).json({
+      error: error.message,
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+  }
+});
+
+app.post('/api/enable-live-data', async (req, res) => {
+  try {
+    await dataProvider.enableLiveMode();
+    res.json({
+      success: true,
+      message: 'Live data mode enabled',
+      status: dataProvider.getLiveDataStatus(),
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+  }
 });
 
 app.post('/api/data/enable-live', async (req, res) => {

@@ -74,7 +74,13 @@ class DemoDataGenerator {
       optionStrike: Math.round(entryPrice / 50) * 50,
       riskReward: '1:2',
       pnl: 0,
-      receivedAt: new Date().toISOString()
+      receivedAt: new Date().toISOString(),
+      conditions: {
+        trendFilter: Math.random() > 0.3,
+        momentumTrigger: Math.random() > 0.5 ? 'RSI' : 'MACD',
+        volatilityStructure: Math.random() > 0.2,
+        signalValidation: Math.random() > 0.1
+      }
     };
 
     // Push to high-frequency service with high priority

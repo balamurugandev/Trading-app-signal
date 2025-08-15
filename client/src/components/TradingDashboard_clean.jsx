@@ -522,7 +522,7 @@ const SignalFeed = ({ isDemoMode, selectedSymbol, currentMarketData, onActiveSig
                         ✓ Trend
                       </Badge>
                       <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800">
-                        ✓ {signal.conditions.momentumTrigger}
+                        ✓ {signal.conditions?.momentumTrigger || 'Momentum'}
                       </Badge>
                       <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800">
                         ✓ Structure

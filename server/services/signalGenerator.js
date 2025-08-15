@@ -5,6 +5,7 @@ class SignalGenerator {
     this.ta = technicalAnalysis;
     this.riskManager = riskManager;
     this.lastSignals = new Map(); // Track last signal time to avoid spam
+    this.lastSignalData = new Map(); // Track last signal data to avoid duplicates
   }
 
   /**
@@ -19,26 +20,64 @@ class SignalGenerator {
       const currentCandle = marketData[marketData.length - 1];
       const currentPrice = currentCandle.close;
 
-      // Check if we recently generated a signal (avoid spam) - RELAXED for testing
+      // Check if we recently generated a signal (avoid spam)
       const signalKey = `${symbol}_${timeframe}`;
       const lastSignalTime = this.lastSignals.get(signalKey);
+      const lastSignalData = this.lastSignalData.get(signalKey);
       const now = moment();
       
-      // Reduce minimum interval for more frequent signals during testing
-      const minInterval = Math.max(1, this.getMinSignalInterval(timeframe) * 0.5); // 50% of normal interval
+      // Increase minimum interval to reduce spam
+      const minInterval = Math.max(5, this.getMinSignalInterval(timeframe) * 2); // Double the normal interval, minimum 5 minutes
       
       if (lastSignalTime && now.diff(lastSignalTime, 'minutes') < minInterval) {
         console.log(`Signal blocked - too recent. Last: ${lastSignalTime.format('HH:mm:ss')}, Min interval: ${minInterval}min`);
         return null;
       }
 
-      // SCALPING MODE: Very relaxed conditions for frequent signals
-      const trendFilter = this.checkTrendFilter(currentPrice, indicators);
-      const momentumTrigger = this.checkMomentumTrigger(indicators);
-      const volatilityStructure = this.checkVolatilityStructure(currentPrice, indicators);
-      const signalValidation = this.validateSignal(indicators);
+      // Check if market conditions have changed significantly since last signal
+      if (lastSignalData) {
+        const priceChange = Math.abs(currentPrice - lastSignalData.price) / lastSignalData.price;
+        const timeElapsed = now.diff(lastSignalTime, 'minutes');
+        
+        // Only generate new signal if price has moved significantly (>0.1%) or enough time has passed (>15 minutes)
+        if (priceChange < 0.001 && timeElapsed < 15) {
+          console.log(`Signal blocked - market conditions unchanged. Price change: ${(priceChange * 100).toFixed(3)}%, Time: ${timeElapsed}min`);
+          return null;
+        }
+      }
 
-      console.log(`Original conditions: Trend=${trendFilter.passed}, Momentum=${momentumTrigger.passed}, Volatility=${volatilityStructure.passed}, Validation=${signalValidation.passed}`);
+      // SCALPING MODE: Very relaxed conditions for frequent signals with error handling
+      let trendFilter, momentumTrigger, volatilityStructure, signalValidation;
+      
+      try {
+        trendFilter = this.checkTrendFilter(currentPrice, indicators) || { passed: false, reason: 'No trend data' };
+      } catch (error) {
+        console.warn('Error in checkTrendFilter:', error.message);
+        trendFilter = { passed: false, reason: 'Trend filter error' };
+      }
+      
+      try {
+        momentumTrigger = this.checkMomentumTrigger(indicators) || { passed: false, reason: 'No momentum data' };
+      } catch (error) {
+        console.warn('Error in checkMomentumTrigger:', error.message);
+        momentumTrigger = { passed: false, reason: 'Momentum trigger error' };
+      }
+      
+      try {
+        volatilityStructure = this.checkVolatilityStructure(currentPrice, indicators) || { passed: false, reason: 'No volatility data' };
+      } catch (error) {
+        console.warn('Error in checkVolatilityStructure:', error.message);
+        volatilityStructure = { passed: false, reason: 'Volatility structure error' };
+      }
+      
+      try {
+        signalValidation = this.validateSignal(indicators) || { passed: false, reason: 'No validation data' };
+      } catch (error) {
+        console.warn('Error in validateSignal:', error.message);
+        signalValidation = { passed: false, reason: 'Signal validation error' };
+      }
+
+      console.log(`Original conditions: Trend=${trendFilter?.passed}, Momentum=${momentumTrigger?.passed}, Volatility=${volatilityStructure?.passed}, Validation=${signalValidation?.passed}`);
 
       // SCALPING MODE: Generate signals more frequently for testing
       // Handle RSI as either a number or array (take the last value if array)
@@ -51,28 +90,101 @@ class SignalGenerator {
       
       // Override conditions for scalping - always pass
       const scalpingConditions = {
-        trendFilter: { ...trendFilter, passed: true },
-        momentumTrigger: { ...momentumTrigger, passed: true },
-        volatilityStructure: { ...volatilityStructure, passed: true },
-        signalValidation: { ...signalValidation, passed: true }
+        trendFilter: { ...(trendFilter || {}), passed: true },
+        momentumTrigger: { ...(momentumTrigger || {}), passed: true },
+        volatilityStructure: { ...(volatilityStructure || {}), passed: true },
+        signalValidation: { ...(signalValidation || {}), passed: true }
       };
 
-      const signal = this.createBuySignal(
-        symbol,
-        timeframe,
-        currentCandle,
-        indicators,
-        scalpingConditions
-      );
+      let signal;
+      try {
+        signal = this.createBuySignal(
+          symbol,
+          timeframe,
+          currentCandle,
+          indicators,
+          scalpingConditions
+        );
+      } catch (error) {
+        console.error('Error in createBuySignal:', error.message);
+        
+        // Create a simple fallback signal
+        const fallbackStrike = this.getOptionStrike(symbol, currentCandle.close);
+        signal = {
+          type: 'BUY',
+          symbol: symbol,
+          timeframe: timeframe,
+          entryPrice: currentCandle.close,
+          spotPrice: currentCandle.close,
+          premium: this.calculateOptionPremium(currentCandle.close, fallbackStrike, 'CALL'),
+          optionStrike: fallbackStrike,
+          optionType: 'CALL',
+          target1: currentCandle.close * 1.005,
+          target2: currentCandle.close * 1.01,
+          stopLoss: currentCandle.close * 0.995,
+          strength: 50,
+          confidence: 'Low',
+          timestamp: moment().tz('Asia/Kolkata').toISOString(),
+          conditions: scalpingConditions,
+          fallback: true
+        };
+        
+        console.log('✅ Created fallback signal');
+      }
 
-      // Update last signal time
-      this.lastSignals.set(signalKey, now);
+      if (signal) {
+        // Update last signal time and data only if signal was created successfully
+        this.lastSignals.set(signalKey, now);
+        this.lastSignalData.set(signalKey, {
+          price: currentPrice,
+          entryPrice: signal.entryPrice,
+          stopLoss: signal.stopLoss,
+          target1: signal.target1,
+          target2: signal.target2,
+          strength: signal.strength
+        });
+        
+        console.log(`✅ Signal generated and cached for ${signalKey}`);
+      }
 
       return signal;
 
     } catch (error) {
       console.error(`Error generating signal for ${symbol} ${timeframe}:`, error);
-      return null;
+      console.error('Stack trace:', error.stack);
+      
+      // Return a basic fallback signal to prevent complete failure
+      try {
+        const emergencyPrice = currentCandle?.close || 25000;
+        const emergencyStrike = this.getOptionStrike(symbol, emergencyPrice);
+        return {
+          type: 'BUY',
+          symbol: symbol,
+          timeframe: timeframe,
+          entryPrice: emergencyPrice,
+          spotPrice: emergencyPrice,
+          premium: this.calculateOptionPremium(emergencyPrice, emergencyStrike, 'CALL'),
+          optionStrike: emergencyStrike,
+          optionType: 'CALL',
+          target1: emergencyPrice * 1.005,
+          target2: emergencyPrice * 1.01,
+          stopLoss: emergencyPrice * 0.995,
+          strength: 30,
+          confidence: 'Emergency',
+          timestamp: moment().tz('Asia/Kolkata').toISOString(),
+          conditions: {
+            trendFilter: false,
+            momentumTrigger: 'EMERGENCY',
+            volatilityStructure: false,
+            signalValidation: false
+          },
+          error: true,
+          errorMessage: error.message
+        };
+      } catch (fallbackError) {
+        console.error('Even fallback signal creation failed:', fallbackError);
+        return null;
+      }
     }
   }
 
@@ -241,6 +353,8 @@ class SignalGenerator {
       
       // Entry details
       entryPrice: currentPrice,
+      spotPrice: currentPrice,
+      premium: this.calculateOptionPremium(currentPrice, optionStrike, 'CALL'),
       optionStrike,
       optionType: 'CALL',
       
@@ -257,10 +371,10 @@ class SignalGenerator {
       // Signal strength and conditions
       strength: this.calculateSignalStrength(conditions),
       conditions: {
-        trendFilter: conditions.trendFilter.passed,
-        momentumTrigger: conditions.momentumTrigger.trigger,
-        volatilityStructure: conditions.volatilityStructure.passed,
-        signalValidation: conditions.signalValidation.passed
+        trendFilter: conditions.trendFilter?.passed || false,
+        momentumTrigger: conditions.momentumTrigger?.trigger || 'UNKNOWN',
+        volatilityStructure: conditions.volatilityStructure?.passed || false,
+        signalValidation: conditions.signalValidation?.passed || false
       },
       
       // Trading instructions
@@ -332,22 +446,20 @@ class SignalGenerator {
     let strength = 0;
     
     // Trend filter strength
-    if (conditions.trendFilter.passed) strength += 25;
+    if (conditions.trendFilter?.passed) strength += 25;
     
     // Momentum trigger strength
-    if (conditions.momentumTrigger.rsiCondition) {
+    if (conditions.momentumTrigger?.rsiCondition) {
       strength += 25; // RSI condition met
     }
-    if (conditions.momentumTrigger.macdCondition) {
+    if (conditions.momentumTrigger?.macdCondition) {
       strength += 20; // MACD condition met
     }
     
-    if (conditions.momentumTrigger.macdCondition) strength += 25;
-    
     // Volatility/structure strength
-    if (conditions.volatilityStructure.bbBreakout) strength += 20;
-    if (conditions.volatilityStructure.cprSupport) strength += 15;
-    if (conditions.volatilityStructure.pivotSupport) strength += 10;
+    if (conditions.volatilityStructure?.bbBreakout) strength += 20;
+    if (conditions.volatilityStructure?.cprSupport) strength += 15;
+    if (conditions.volatilityStructure?.pivotSupport) strength += 10;
     
     return Math.min(strength, 100); // Cap at 100%
   }
@@ -358,13 +470,32 @@ class SignalGenerator {
   generateTradingInstructions(conditions, stopLoss, target1, target2) {
     const instructions = [];
     
-    instructions.push(`Entry: Buy ${conditions.momentumTrigger.trigger} momentum signal`);
-    instructions.push(`Stop Loss: ${stopLoss.toFixed(2)} (${conditions.volatilityStructure.cprSupport ? 'CPR' : 'Technical'} level)`);
+    instructions.push(`Entry: Buy ${conditions.momentumTrigger?.trigger || 'momentum'} signal`);
+    instructions.push(`Stop Loss: ${stopLoss.toFixed(2)} (${conditions.volatilityStructure?.cprSupport ? 'CPR' : 'Technical'} level)`);
     instructions.push(`Target 1: ${target1.toFixed(2)} (1R) - Exit 50% position`);
     instructions.push(`Target 2: ${target2.toFixed(2)} (1.5R) - Exit remaining 50%`);
     instructions.push(`Trail remaining position with 9 EMA after Target 1`);
     
     return instructions;
+  }
+
+  /**
+   * Calculate option premium (simplified Black-Scholes approximation)
+   */
+  calculateOptionPremium(spotPrice, strikePrice, optionType = 'CALL') {
+    // Simplified premium calculation for demo purposes
+    const intrinsicValue = optionType === 'CALL' 
+      ? Math.max(0, spotPrice - strikePrice)
+      : Math.max(0, strikePrice - spotPrice);
+    
+    // Time value based on moneyness and volatility
+    const moneyness = Math.abs(spotPrice - strikePrice) / spotPrice;
+    const timeValue = spotPrice * 0.02 * (1 + moneyness * 2); // Simplified time value
+    
+    const premium = intrinsicValue + timeValue;
+    
+    // Ensure minimum premium of 10 and reasonable maximum
+    return Math.max(10, Math.min(premium, spotPrice * 0.1));
   }
 
   /**
@@ -381,10 +512,10 @@ class SignalGenerator {
     const multiplier = isLiquidWindow ? 0.3 : 0.7; // More aggressive during liquid, but still active during all hours
     
     switch (timeframe) {
-      case '1m': return Math.max(1, Math.floor(3 * multiplier)); // 1-2 minutes
-      case '5m': return Math.max(2, Math.floor(8 * multiplier)); // 2-6 minutes  
-      case '15m': return Math.max(5, Math.floor(20 * multiplier)); // 5-14 minutes
-      default: return Math.max(1, Math.floor(4 * multiplier));
+      case '1m': return Math.max(5, Math.floor(10 * multiplier)); // 5-7 minutes minimum
+      case '5m': return Math.max(10, Math.floor(20 * multiplier)); // 10-14 minutes minimum
+      case '15m': return Math.max(15, Math.floor(30 * multiplier)); // 15-21 minutes minimum
+      default: return Math.max(8, Math.floor(15 * multiplier));
     }
   }
 }

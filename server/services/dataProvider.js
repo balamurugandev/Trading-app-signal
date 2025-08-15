@@ -9,22 +9,22 @@ class DataProvider {
     this.historicalCache = new Map();
     this.historicalCacheTimeout = 300000; // 5 minutes for historical data
     
-    // Live data integration
-    this.isLiveMode = process.env.LIVE_DATA === 'true' || false;
+    // Live data integration - FORCE LIVE MODE
+    console.log('🔧 DataProvider constructor - LIVE_DATA env:', process.env.LIVE_DATA);
+    this.isLiveMode = true; // FORCE LIVE MODE
     this.yahooProvider = new YahooFinanceProvider();
     
-    // Demo mode data generator
-    this.demoMode = !this.isLiveMode; // Use demo mode when not live
+    // Demo mode data generator - DISABLE DEMO MODE
+    this.demoMode = false; // FORCE DISABLE DEMO MODE
     this.demoData = new Map();
     this.initializeDemoData();
     
     // Fix base prices if needed
     this.updateDemoBasePrices();
     
-    // Initialize live data if enabled
-    if (this.isLiveMode) {
-      this.initializeLiveData();
-    }
+    // ALWAYS initialize live data
+    console.log('🚀 DataProvider: Forcing live data initialization...');
+    this.initializeLiveData();
   }
 
   /**
@@ -500,8 +500,10 @@ class DataProvider {
    * Get current live market data
    */
   getCurrentMarketData(symbol) {
-    // In live mode, ONLY return live data - no fallbacks to demo data
-    if (this.isLiveMode && !this.demoMode && this.yahooProvider) {
+    console.log(`🔍 getCurrentMarketData called for ${symbol} - isLiveMode: ${this.isLiveMode}, demoMode: ${this.demoMode}`);
+    
+    // FORCE LIVE MODE - always try to get live data first
+    if (this.yahooProvider) {
       const liveData = this.yahooProvider.getLatestData(symbol);
       if (liveData) {
         console.log(`📊 Live data for ${symbol}: ₹${liveData.ltp} (${liveData.sessionInfo?.dataSource || 'live'})`);
@@ -517,9 +519,10 @@ class DataProvider {
           marketState: liveData.marketState
         };
       } else {
-        console.log(`❌ No live data available for ${symbol} - returning null`);
-        return null; // Don't fallback to demo data in live mode
+        console.log(`⚠️  No live data available for ${symbol} from Yahoo provider`);
       }
+    } else {
+      console.log(`❌ Yahoo provider not available for ${symbol}`);
     }
     
     // Only use demo data when explicitly in demo mode

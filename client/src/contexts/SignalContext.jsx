@@ -20,7 +20,13 @@ const sampleSignals = [
     optionStrike: 24500,
     riskReward: '1:2',
     pnl: 0,
-    receivedAt: new Date(Date.now() - 300000).toISOString()
+    receivedAt: new Date(Date.now() - 300000).toISOString(),
+    conditions: {
+      trendFilter: true,
+      momentumTrigger: 'RSI',
+      volatilityStructure: true,
+      signalValidation: true
+    }
   },
   {
     id: 'sample_2',
@@ -39,7 +45,13 @@ const sampleSignals = [
     pnl: 2.5,
     receivedAt: new Date(Date.now() - 600000).toISOString(),
     exitPrice: 55000.00,
-    exitTime: new Date(Date.now() - 300000).toISOString()
+    exitTime: new Date(Date.now() - 300000).toISOString(),
+    conditions: {
+      trendFilter: true,
+      momentumTrigger: 'MACD',
+      volatilityStructure: true,
+      signalValidation: true
+    }
   },
   {
     id: 'sample_3',
@@ -58,7 +70,13 @@ const sampleSignals = [
     pnl: -1.2,
     receivedAt: new Date(Date.now() - 900000).toISOString(),
     exitPrice: 24450.00,
-    exitTime: new Date(Date.now() - 600000).toISOString()
+    exitTime: new Date(Date.now() - 600000).toISOString(),
+    conditions: {
+      trendFilter: true,
+      momentumTrigger: 'RSI',
+      volatilityStructure: false,
+      signalValidation: true
+    }
   }
 ];
 
