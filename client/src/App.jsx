@@ -13,6 +13,7 @@ import { SignalProvider } from './contexts/SignalContext';
 const TradingDashboard = React.lazy(() => import('./components/TradingDashboard'));
 const AdvancedTradingDashboard = React.lazy(() => import('./components/AdvancedTradingDashboard'));
 const OptimizedTradingDashboard = React.lazy(() => import('./components/OptimizedTradingDashboard'));
+const GridDashboard = React.lazy(() => import('./components/GridDashboard'));
 
 // Loading component
 const LoadingSpinner = ({ message = "Loading..." }) => (
@@ -67,7 +68,7 @@ class ErrorBoundary extends React.Component {
 function App() {
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const [dashboardMode, setDashboardMode] = useState('optimized'); // 'standard', 'advanced', or 'optimized'
+  const [dashboardMode, setDashboardMode] = useState('grid'); // 'standard', 'advanced', 'optimized', or 'grid'
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
@@ -169,6 +170,15 @@ function App() {
   const DashboardToggle = () => (
     <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-2 bg-white rounded-lg p-3 shadow-xl border border-gray-200 backdrop-blur-sm">
       <Button
+        variant={dashboardMode === 'grid' ? "default" : "ghost"}
+        size="sm"
+        onClick={() => setDashboardMode('grid')}
+        className="flex items-center space-x-1 text-sm"
+      >
+        <BarChart3 className="h-4 w-4" />
+        <span>Grid</span>
+      </Button>
+      <Button
         variant={dashboardMode === 'optimized' ? "default" : "ghost"}
         size="sm"
         onClick={() => setDashboardMode('optimized')}
@@ -195,10 +205,10 @@ function App() {
         <Settings className="h-4 w-4" />
         <span>Advanced</span>
       </Button>
-      {dashboardMode === 'optimized' && (
-        <Badge className="bg-blue-500 text-white text-xs animate-pulse">
-          <Zap className="h-3 w-3 mr-1" />
-          Fast
+      {dashboardMode === 'grid' && (
+        <Badge className="bg-indigo-500 text-white text-xs animate-pulse">
+          <BarChart3 className="h-3 w-3 mr-1" />
+          AG Grid
         </Badge>
       )}
     </div>
@@ -211,7 +221,9 @@ function App() {
           <SignalProvider>
             <DashboardToggle />
             <Suspense fallback={<LoadingSpinner message={`Loading ${dashboardMode} dashboard...`} />}>
-              {dashboardMode === 'optimized' ? (
+              {dashboardMode === 'grid' ? (
+                <GridDashboard connectionStatus={connectionStatus} />
+              ) : dashboardMode === 'optimized' ? (
                 <OptimizedTradingDashboard connectionStatus={connectionStatus} />
               ) : dashboardMode === 'standard' ? (
                 <TradingDashboard connectionStatus={connectionStatus} />

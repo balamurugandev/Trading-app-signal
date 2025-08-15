@@ -2,6 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* AG Grid Dark Theme Enhancements */
+.ag-theme-quartz-dark {
+  --ag-background-color: #1f2836;
+  --ag-foreground-color: #ffffff;
+  --ag-border-color: #3a4553;
+  --ag-header-background-color: #2a3441;
+  --ag-header-foreground-color: #ffffff;
+  --ag-odd-row-background-color: #252d3a;
+  --ag-row-hover-color: #3a4553;
+  --ag-selected-row-background-color: #4f46e520;
+  --ag-range-selection-background-color: #4f46e520;
+  --ag-input-background-color: #2a3441;
+  --ag-input-border-color: #3a4553;
+  --ag-input-focus-border-color: #4f46e5;
+  --ag-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --ag-font-size: 13px;
+  --ag-header-font-size: 14px;
+  --ag-header-font-weight: 600;
+}
+
+/* Custom AG Grid Styling */
+.ag-theme-quartz .ag-header-cell-text {
+  font-weight: 600;
+  color: var(--ag-header-foreground-color);
+}
+
+.ag-theme-quartz .ag-cell {
+  display: flex;
+  align-items: center;
+  line-height: 1.4;
+}
+
+.ag-theme-quartz .ag-row-selected {
+  border: 1px solid #4f46e5;
+  background-color: var(--ag-selected-row-background-color) !important;
+}
+
+.ag-theme-quartz .ag-row:hover {
+  background-color: var(--ag-row-hover-color) !important;
+}
+
+/* Scrollbar styling for AG Grid */
+.ag-theme-quartz .ag-body-horizontal-scroll-viewport::-webkit-scrollbar,
+.ag-theme-quartz .ag-body-vertical-scroll-viewport::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ag-theme-quartz .ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track,
+.ag-theme-quartz .ag-body-vertical-scroll-viewport::-webkit-scrollbar-track {
+  background: var(--ag-background-color);
+}
+
+.ag-theme-quartz .ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb,
+.ag-theme-quartz .ag-body-vertical-scroll-viewport::-webkit-scrollbar-thumb {
+  background: #3a4553;
+  border-radius: 4px;
+}
+
+.ag-theme-quartz .ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb:hover,
+.ag-theme-quartz .ag-body-vertical-scroll-viewport::-webkit-scrollbar-thumb:hover {
+  background: #4a5568;
+}
+
+/* Custom grid classes */
+.signals-grid .ag-header {
+  border-bottom: 2px solid var(--ag-border-color);
+}
+
+.market-data-grid .ag-header {
+  border-bottom: 2px solid var(--ag-border-color);
+}
+
+/* Animation for grid updates */
+.ag-theme-quartz .ag-cell-data-changed {
+  background-color: #4f46e520 !important;
+  transition: background-color 0.3s ease;
+}
+
+.ag-theme-quartz .ag-cell-data-changed-animation {
+  background-color: transparent !important;
+}
+
 /* Basic CSS reset and body styles */
 * {
   margin: 0;
