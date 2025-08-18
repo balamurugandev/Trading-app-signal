@@ -11,6 +11,7 @@ const SignalGenerator = require('./services/signalGenerator');
 const RiskManager = require('./services/riskManager');
 const AdvancedSignalEngine = require('./services/advancedSignalEngine');
 const ExecutionQualityService = require('./services/executionQuality');
+const ProfessionalSignalEngine = require('./services/scalping/professionalSignalEngine');
 
 const app = express();
 const server = http.createServer(app);
@@ -65,6 +66,7 @@ if (process.env.LIVE_DATA === 'true') {
 // Initialize advanced services
 const advancedSignalEngine = new AdvancedSignalEngine();
 const executionQualityService = new ExecutionQualityService();
+const professionalSignalEngine = new ProfessionalSignalEngine(dataProvider, technicalAnalysis);
 
 // Market session tracking
 let isMarketOpen = false;
@@ -641,6 +643,85 @@ app.post('/api/advanced/generate-signal', (req, res) => {
   } catch (error) {
     console.error('Signal generation error:', error);
     res.status(500).json({ error: 'Failed to generate signal' });
+  }
+});
+
+// Professional scalping signal generation
+app.post('/api/professional/generate-signal', async (req, res) => {
+  try {
+    const { symbol, timeframe } = req.body;
+    
+    if (!symbol || !timeframe) {
+      return res.status(400).json({ error: 'Symbol and timeframe are required' });
+    }
+    
+    if (!['NIFTY', 'BANKNIFTY'].includes(symbol)) {
+      return res.status(400).json({ error: 'Symbol must be NIFTY or BANKNIFTY' });
+    }
+    
+    if (!['1m', '5m'].includes(timeframe)) {
+      return res.status(400).json({ error: 'Professional signals only support 1m and 5m timeframes' });
+    }
+    
+    console.log(`🎯 Generating professional signal for ${symbol} ${timeframe}`);
+    const signal = await professionalSignalEngine.generateScalpingSignal(symbol, timeframe);
+    
+    if (!signal) {
+      return res.status(404).json({ 
+        error: 'No professional signal generated',
+        reason: 'Conditions not met or failed validation gates',
+        timestamp: moment().tz('Asia/Kolkata').toISOString()
+      });
+    }
+    
+    console.log(`✅ Professional signal generated with ${signal.validation.gate_score}% gate score`);
+    
+    res.json({
+      signal,
+      type: 'PROFESSIONAL_SCALPING',
+      validation_score: signal.validation.gate_score,
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Professional signal generation error:', error);
+    res.status(500).json({ error: 'Failed to generate professional signal' });
+  }
+});
+
+// Get professional signal validation rules
+app.get('/api/professional/validation-rules', (req, res) => {
+  const { VALIDATION_RULES } = require('./services/scalping/signalSchema');
+  res.json({
+    rules: VALIDATION_RULES,
+    description: 'Quality gates and validation rules for professional signals',
+    timestamp: moment().tz('Asia/Kolkata').toISOString()
+  });
+});
+
+// Professional signal backtest stats
+app.get('/api/professional/backtest-stats/:symbol/:timeframe', (req, res) => {
+  try {
+    const { symbol, timeframe } = req.params;
+    const statsKey = `${symbol}_${timeframe}`;
+    
+    // Get stats from professional engine
+    const stats = professionalSignalEngine.backtestStats[statsKey];
+    
+    if (!stats) {
+      return res.status(404).json({ error: 'No backtest stats available for this combination' });
+    }
+    
+    res.json({
+      symbol,
+      timeframe,
+      stats,
+      timestamp: moment().tz('Asia/Kolkata').toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Backtest stats error:', error);
+    res.status(500).json({ error: 'Failed to retrieve backtest stats' });
   }
 });
 
