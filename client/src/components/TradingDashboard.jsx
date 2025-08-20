@@ -456,15 +456,30 @@ const SignalFeed = ({ selectedSymbol, currentMarketData, onActiveSignalsChange, 
                                             </div>
                                             <div>
                                                 <p className="text-gray-600 font-medium">Strike & Premium</p>
-                                                <p className="font-bold text-green-800">{formatPrice(signal.premium)} ({signal.optionStrike} {signal.optionType})</p>
+                                                <p className="font-bold text-green-800">
+                                                    ₹{signal.premium} ({signal.optionStrike} {signal.optionType})
+                                                </p>
+                                                {signal.expiry && (
+                                                    <p className="text-xs text-gray-500">Exp: {signal.expiry}</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="text-gray-600 font-medium">Stop Loss</p>
                                                 <p className="font-bold text-red-600">{formatSpotPrice(signal.stopLoss)}</p>
+                                                {signal.premiumStopLoss && (
+                                                    <p className="text-xs text-gray-500">
+                                                        Premium SL: ₹{signal.premiumStopLoss}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="text-gray-600 font-medium">Target 1</p>
                                                 <p className="font-bold text-green-600">{formatSpotPrice(signal.target1)}</p>
+                                                {signal.premiumTarget1 && (
+                                                    <p className="text-xs text-gray-500">
+                                                        Premium T1: ₹{signal.premiumTarget1}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -473,7 +488,9 @@ const SignalFeed = ({ selectedSymbol, currentMarketData, onActiveSignalsChange, 
                                                 ✓ Trend
                                             </Badge>
                                             <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800">
-                                                ✓ {signal.conditions?.momentumTrigger || 'Momentum'}
+                                                ✓ {typeof signal.conditions?.momentumTrigger === 'string' 
+                                                    ? signal.conditions.momentumTrigger 
+                                                    : signal.conditions?.momentumTrigger?.trigger || 'Momentum'}
                                             </Badge>
                                             <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800">
                                                 ✓ Structure

@@ -12,13 +12,14 @@ class SignalGenerator {
    * Generate BUY signals based on confluence strategy
    * Only generates signals during liquid windows with all filters aligned
    */
-  generateSignal(symbol, timeframe, marketData, indicators) {
+  generateSignal(symbol, timeframe, marketData, indicators, currentMarketPrice = null) {
     try {
       // Skip if insufficient data
       if (!marketData || marketData.length < 50) return null;
 
       const currentCandle = marketData[marketData.length - 1];
-      const currentPrice = currentCandle.close;
+      // Use current market price if provided, otherwise use candle close
+      const currentPrice = currentMarketPrice || currentCandle.close;
 
       // Check if we recently generated a signal (avoid spam)
       const signalKey = `${symbol}_${timeframe}`;
@@ -86,7 +87,7 @@ class SignalGenerator {
       // VERY RELAXED CONDITIONS FOR SCALPING TESTING - Always generate signals during market hours
       const basicConditionsMet = true; // Always pass for testing
 
-      console.log(`✅ GENERATING SCALPING SIGNAL - RSI: ${currentRSI?.toFixed(1)}, Price: ${currentCandle.close}`);
+      console.log(`✅ GENERATING SCALPING SIGNAL - RSI: ${currentRSI?.toFixed(1)}, Price: ${currentPrice}`);
       
       // Override conditions for scalping - always pass
       const scalpingConditions = {
@@ -103,25 +104,26 @@ class SignalGenerator {
           timeframe,
           currentCandle,
           indicators,
-          scalpingConditions
+          scalpingConditions,
+          currentPrice
         );
       } catch (error) {
         console.error('Error in createBuySignal:', error.message);
         
         // Create a simple fallback signal
-        const fallbackStrike = this.getOptionStrike(symbol, currentCandle.close);
+        const fallbackStrike = this.getOptionStrike(symbol, currentPrice);
         signal = {
           type: 'BUY',
           symbol: symbol,
           timeframe: timeframe,
-          entryPrice: currentCandle.close,
-          spotPrice: currentCandle.close,
-          premium: this.calculateOptionPremium(currentCandle.close, fallbackStrike, 'CALL'),
+          entryPrice: currentPrice,
+          spotPrice: currentPrice,
+          premium: this.calculateOptionPremium(currentPrice, fallbackStrike, 'CALL'),
           optionStrike: fallbackStrike,
           optionType: 'CALL',
-          target1: currentCandle.close * 1.005,
-          target2: currentCandle.close * 1.01,
-          stopLoss: currentCandle.close * 0.995,
+          target1: currentPrice * 1.005,
+          target2: currentPrice * 1.01,
+          stopLoss: currentPrice * 0.995,
           strength: 50,
           confidence: 'Low',
           timestamp: moment().tz('Asia/Kolkata').toISOString(),
@@ -155,7 +157,7 @@ class SignalGenerator {
       
       // Return a basic fallback signal to prevent complete failure
       try {
-        const emergencyPrice = currentCandle?.close || 25000;
+        const emergencyPrice = currentPrice || currentCandle?.close || 25000;
         const emergencyStrike = this.getOptionStrike(symbol, emergencyPrice);
         return {
           type: 'BUY',
@@ -329,20 +331,31 @@ class SignalGenerator {
   /**
    * Create BUY signal with all necessary details
    */
-  createBuySignal(symbol, timeframe, currentCandle, indicators, conditions) {
-    const currentPrice = currentCandle.close;
+  createBuySignal(symbol, timeframe, currentCandle, indicators, conditions, currentPrice = null) {
+    const price = currentPrice || currentCandle.close;
     const { cpr, vwap, ema9, psar } = indicators;
 
     // Calculate stop loss (pullback low, VWAP, or CPR band)
-    const stopLoss = this.calculateStopLoss(currentPrice, currentCandle, indicators);
+    const spotStopLoss = this.calculateStopLoss(price, currentCandle, indicators);
     
     // Calculate targets (1R-1.5R)
-    const riskAmount = currentPrice - stopLoss;
-    const target1 = currentPrice + (riskAmount * 1.0); // 1R
-    const target2 = currentPrice + (riskAmount * 1.5); // 1.5R
+    const riskAmount = price - spotStopLoss;
+    const spotTarget1 = price + (riskAmount * 1.0); // 1R
+    const spotTarget2 = price + (riskAmount * 1.5); // 1.5R
 
     // Determine option strike (ATM or slightly ITM)
-    const optionStrike = this.getOptionStrike(symbol, currentPrice);
+    const optionStrike = this.getOptionStrike(symbol, price);
+    
+    // Calculate realistic option premium
+    const optionPremium = this.calculateOptionPremium(price, optionStrike, 'CALL', symbol);
+    
+    // Get expiry date
+    const expiryDate = this.getNextExpiryDate();
+    
+    // Calculate strike-based stop loss and targets
+    const strikeBasedLevels = this.calculateStrikeBasedLevels(
+      price, optionStrike, spotStopLoss, spotTarget1, spotTarget2, symbol
+    );
 
     return {
       id: `${symbol}_${timeframe}_${Date.now()}`,
@@ -352,16 +365,28 @@ class SignalGenerator {
       timestamp: moment().tz('Asia/Kolkata').toISOString(),
       
       // Entry details
-      entryPrice: currentPrice,
-      spotPrice: currentPrice,
-      premium: this.calculateOptionPremium(currentPrice, optionStrike, 'CALL'),
+      entryPrice: price,
+      spotPrice: price,
+      premium: optionPremium,
       optionStrike,
       optionType: 'CALL',
+      expiry: expiryDate,
       
-      // Risk management
-      stopLoss,
-      target1,
-      target2,
+      // Spot-based levels
+      stopLoss: spotStopLoss,
+      target1: spotTarget1,
+      target2: spotTarget2,
+      
+      // Strike-based levels (for options trading)
+      strikeStopLoss: strikeBasedLevels.stopLoss,
+      strikeTarget1: strikeBasedLevels.target1,
+      strikeTarget2: strikeBasedLevels.target2,
+      
+      // Premium-based levels (what the option premium should be at these levels)
+      premiumStopLoss: strikeBasedLevels.premiumStopLoss,
+      premiumTarget1: strikeBasedLevels.premiumTarget1,
+      premiumTarget2: strikeBasedLevels.premiumTarget2,
+      
       riskReward: '1:1.5',
       
       // Technical context
@@ -415,14 +440,14 @@ class SignalGenerator {
   }
 
   /**
-   * Get appropriate option strike (ATM or slightly ITM)
+   * Get appropriate option strike (slightly ITM for scalping)
    */
   getOptionStrike(symbol, currentPrice) {
     // Round to nearest strike based on symbol
     let strikeInterval;
     
     if (symbol === 'NIFTY') {
-      strikeInterval = currentPrice > 20000 ? 100 : 50;
+      strikeInterval = currentPrice > 20000 ? 50 : 50; // Always use 50 for NIFTY
     } else if (symbol === 'BANKNIFTY') {
       strikeInterval = 100;
     } else {
@@ -432,11 +457,12 @@ class SignalGenerator {
     // ATM strike
     const atmStrike = Math.round(currentPrice / strikeInterval) * strikeInterval;
     
-    // Slightly ITM (one strike below for calls)
+    // For scalping, use slightly ITM strikes (better delta, lower premium)
+    // ITM strikes have higher probability and better movement correlation
     const itmStrike = atmStrike - strikeInterval;
     
-    // Return ATM for now, can be made configurable
-    return atmStrike;
+    // Return ITM strike for scalping (better for quick moves)
+    return itmStrike;
   }
 
   /**
@@ -480,22 +506,124 @@ class SignalGenerator {
   }
 
   /**
-   * Calculate option premium (simplified Black-Scholes approximation)
+   * Calculate realistic option premium for scalping (ITM options)
    */
-  calculateOptionPremium(spotPrice, strikePrice, optionType = 'CALL') {
-    // Simplified premium calculation for demo purposes
+  calculateOptionPremium(spotPrice, strikePrice, optionType = 'CALL', symbol = 'NIFTY') {
+    // Get current VIX/volatility (lower for scalping)
+    const currentVIX = this.getCurrentVIX();
+    const volatility = (currentVIX / 100) * 0.8; // Reduce volatility for scalping
+    
+    // Time to expiry (assume weekly expiry - next Thursday)
+    const timeToExpiry = this.getTimeToExpiry();
+    
+    // Calculate intrinsic value
     const intrinsicValue = optionType === 'CALL' 
       ? Math.max(0, spotPrice - strikePrice)
       : Math.max(0, strikePrice - spotPrice);
     
-    // Time value based on moneyness and volatility
-    const moneyness = Math.abs(spotPrice - strikePrice) / spotPrice;
-    const timeValue = spotPrice * 0.02 * (1 + moneyness * 2); // Simplified time value
+    // For scalping, we focus on ITM options with high intrinsic value
+    const moneyness = spotPrice / strikePrice;
+    const isITM = (optionType === 'CALL' && moneyness > 1) || (optionType === 'PUT' && moneyness < 1);
     
-    const premium = intrinsicValue + timeValue;
+    // Realistic time value for scalping (much lower than swing trading)
+    let timeValue = 0;
     
-    // Ensure minimum premium of 10 and reasonable maximum
-    return Math.max(10, Math.min(premium, spotPrice * 0.1));
+    if (isITM) {
+      // ITM options for scalping - minimal time value
+      const distanceFromATM = Math.abs(moneyness - 1);
+      timeValue = spotPrice * volatility * Math.sqrt(timeToExpiry / 365) * (0.15 - distanceFromATM * 0.1);
+    } else {
+      // ATM/OTM options - moderate time value
+      timeValue = spotPrice * volatility * Math.sqrt(timeToExpiry / 365) * 0.2;
+    }
+    
+    // Ensure realistic minimum time value for scalping
+    timeValue = Math.max(timeValue, symbol === 'NIFTY' ? 8 : 15);
+    
+    // Calculate total premium
+    let premium = intrinsicValue + timeValue;
+    
+    // Apply symbol-specific adjustments for scalping
+    if (symbol === 'BANKNIFTY') {
+      premium *= 1.15; // Slightly higher for BANKNIFTY
+    }
+    
+    // Realistic bounds for scalping (tighter ranges)
+    const minPremium = symbol === 'NIFTY' ? 12 : 20;
+    const maxPremium = symbol === 'NIFTY' ? 80 : 150; // Much tighter max for scalping
+    
+    premium = Math.max(minPremium, Math.min(premium, maxPremium));
+    
+    return Math.round(premium * 100) / 100; // Round to 2 decimal places
+  }
+
+  /**
+   * Get current VIX value (simplified)
+   */
+  getCurrentVIX() {
+    // In a real implementation, this would fetch actual VIX data
+    // For now, return a realistic VIX value based on market conditions
+    const now = moment().tz('Asia/Kolkata');
+    const hour = now.hour();
+    
+    // Higher volatility during opening and closing hours
+    if (hour >= 9 && hour <= 10) return 16.5; // Opening volatility
+    if (hour >= 14 && hour <= 15) return 15.8; // Closing volatility
+    return 14.2; // Normal trading hours
+  }
+
+  /**
+   * Get time to expiry in days (weekly expiry on Thursday)
+   */
+  getTimeToExpiry() {
+    const now = moment().tz('Asia/Kolkata');
+    let nextExpiry = moment().tz('Asia/Kolkata').day(4).hour(15).minute(30); // Thursday 3:30 PM
+    
+    // If today is Thursday after 3:30 PM or Friday/Weekend, move to next week
+    if (now.day() > 4 || (now.day() === 4 && now.hour() >= 15 && now.minute() >= 30)) {
+      nextExpiry.add(1, 'week');
+    }
+    
+    const daysToExpiry = nextExpiry.diff(now, 'days', true);
+    return Math.max(0.1, daysToExpiry); // Minimum 0.1 days
+  }
+
+  /**
+   * Get next expiry date string
+   */
+  getNextExpiryDate() {
+    const now = moment().tz('Asia/Kolkata');
+    let nextExpiry = moment().tz('Asia/Kolkata').day(4); // Thursday
+    
+    // If today is Thursday after market close or Friday/Weekend, move to next week
+    if (now.day() > 4 || (now.day() === 4 && now.hour() >= 15 && now.minute() >= 30)) {
+      nextExpiry.add(1, 'week');
+    }
+    
+    return nextExpiry.format('DD-MMM-YYYY').toUpperCase();
+  }
+
+  /**
+   * Calculate strike-based stop loss and targets for options trading
+   */
+  calculateStrikeBasedLevels(spotPrice, strike, spotSL, spotT1, spotT2, symbol) {
+    // For scalping, strike-based levels are the same strike but different premiums
+    // We don't change the strike, we calculate what the premium will be at different spot levels
+    
+    // Calculate expected premiums at different spot price levels
+    const premiumStopLoss = this.calculateOptionPremium(spotSL, strike, 'CALL', symbol);
+    const premiumTarget1 = this.calculateOptionPremium(spotT1, strike, 'CALL', symbol);
+    const premiumTarget2 = this.calculateOptionPremium(spotT2, strike, 'CALL', symbol);
+    
+    // For scalping display, we show the same strike but different expected premiums
+    return {
+      stopLoss: strike, // Same strike
+      target1: strike,  // Same strike
+      target2: strike,  // Same strike
+      premiumStopLoss: Math.round(premiumStopLoss * 100) / 100,
+      premiumTarget1: Math.round(premiumTarget1 * 100) / 100,
+      premiumTarget2: Math.round(premiumTarget2 * 100) / 100
+    };
   }
 
   /**

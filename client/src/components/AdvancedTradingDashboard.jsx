@@ -166,7 +166,10 @@ const EnhancedSignalCard = ({ signal, isDemoMode, onStatusChange }) => {
                 </div>
                 <div>
                     <p className="text-gray-600 font-medium">Strike & Premium</p>
-                    <p className="font-bold text-green-800">{formatPrice(signal.premium)} ({signal.optionStrike})</p>
+                    <p className="font-bold text-green-800">₹{signal.premium} ({signal.optionStrike} {signal.optionType})</p>
+                    {signal.expiry && (
+                        <p className="text-xs text-gray-500">Exp: {signal.expiry}</p>
+                    )}
                 </div>
                 <div>
                     <p className="text-gray-600 font-medium">Stop Loss</p>

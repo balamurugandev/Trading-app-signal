@@ -8,6 +8,7 @@ const cron = require('node-cron');
 const TechnicalAnalysis = require('./services/technicalAnalysis');
 const DataProvider = require('./services/dataProvider');
 const SignalGenerator = require('./services/signalGenerator');
+const SimpleScalpingGenerator = require('./services/simpleScalpingGenerator');
 const RiskManager = require('./services/riskManager');
 const AdvancedSignalEngine = require('./services/advancedSignalEngine');
 const ExecutionQualityService = require('./services/executionQuality');
@@ -50,6 +51,7 @@ const dataProvider = new DataProvider();
 const technicalAnalysis = new TechnicalAnalysis();
 const riskManager = new RiskManager();
 const signalGenerator = new SignalGenerator(technicalAnalysis, riskManager);
+const simpleScalpingGenerator = new SimpleScalpingGenerator();
 
 // Initialize data provider with environment variable check
 console.log('🔧 Environment LIVE_DATA:', process.env.LIVE_DATA);
@@ -191,12 +193,12 @@ async function processMarketData() {
                               (time >= '13:45' && time <= '15:05');
         
         if (!isWeekend && isMarketHours) {
-          const signal = signalGenerator.generateSignal(
-            symbol, 
-            timeframe, 
-            marketData, 
-            indicators
-          );
+          // Get current market price
+          const currentMarketData = await dataProvider.getCurrentMarketData(symbol);
+          const currentPrice = currentMarketData?.ltp || marketData[marketData.length - 1]?.close;
+          
+          // Use simple scalping generator for reliable signals
+          const signal = simpleScalpingGenerator.generateScalpingSignal(symbol, timeframe, currentPrice);
           
           if (signal) {
             console.log(`🚨 LIVE SIGNAL: ${symbol} ${timeframe}:`, signal);
@@ -294,12 +296,17 @@ async function generateRealTimeSignals() {
         // Calculate technical indicators
         const indicators = technicalAnalysis.calculateIndicators(marketData);
         
+        // Get current market price
+        const currentMarketData = await dataProvider.getCurrentMarketData(symbol);
+        const currentPrice = currentMarketData?.ltp || marketData[marketData.length - 1]?.close;
+        
         // Check signal conditions
         const signal = signalGenerator.generateSignal(
           symbol, 
           timeframe, 
           marketData, 
-          indicators
+          indicators,
+          currentPrice
         );
         
         if (signal) {
@@ -522,7 +529,12 @@ app.post('/api/signals/force-generate', async (req, res) => {
             const signalKey = `${symbol}_${timeframe}`;
             signalGenerator.lastSignals.delete(signalKey);
             
-            const signal = signalGenerator.generateSignal(symbol, timeframe, marketData, indicators);
+            // Get current market price
+            const currentMarketData = await dataProvider.getCurrentMarketData(symbol);
+            const currentPrice = currentMarketData?.ltp || marketData[marketData.length - 1]?.close;
+            
+            // Use simple scalping generator for reliable signals
+            const signal = simpleScalpingGenerator.generateScalpingSignal(symbol, timeframe, currentPrice);
             
             if (signal) {
               generatedSignals.push({ symbol, timeframe, signal });
@@ -583,8 +595,12 @@ app.get('/api/signals/generate/:symbol/:timeframe', async (req, res) => {
     try {
       const marketData = await dataProvider.getLatestData(symbol, timeframe);
       if (marketData && marketData.length >= 50) {
+        // Get current market price
+        const currentMarketData = await dataProvider.getCurrentMarketData(symbol);
+        const currentPrice = currentMarketData?.ltp || marketData[marketData.length - 1]?.close;
+        
         const indicators = technicalAnalysis.calculateIndicators(marketData);
-        signal = signalGenerator.generateSignal(symbol, timeframe, marketData, indicators);
+        signal = signalGenerator.generateSignal(symbol, timeframe, marketData, indicators, currentPrice);
       }
     } catch (error) {
       console.log('Regular signal generator failed:', error.message);
